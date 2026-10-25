@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { esc, relTime } from '../site/js/format.js';
+import { diffAnchor, esc, relTime } from '../site/js/format.js';
 import { applyFilters, buildHash, parseHash, sortPrs } from '../site/js/state.js';
 import { renderAbout, renderBanners, renderDetail, renderList, renderSubsystems, renderTechnicalCard, renderTrendingCard } from '../site/js/render.js';
 import { sampleDataset } from '../src/sample/dataset.ts';
@@ -28,8 +28,9 @@ test('trending card shows score, explanation, metrics and GitHub link', () => {
   assert.match(html, /#61001/);
   assert.match(html, new RegExp(`>${pr(61001).trending.score}<`));
   assert.match(html, /href="https:\/\/github.com\/ceph\/ceph\/pull\/61001"/);
-  assert.match(html, /comments 7d/);
-  assert.match(html, /unusual activity/);
+  assert.match(html, /7d:/);
+  assert.match(html, /comments/);
+  assert.match(html, /"badge hot"/);
 });
 
 test('technical card shows subsystems, confidence, explanation and relevant files', () => {
@@ -38,7 +39,7 @@ test('technical card shows subsystems, confidence, explanation and relevant file
   assert.match(html, /High confidence/);
   assert.match(html, /bluestore_types/);
   assert.match(html, /no discussion in 30d/);
-  assert.match(html, /files#diff-[0-9a-f]{64}/);
+  assert.match(html, /\+\d+ more/);
 });
 
 test('detail panel separates measured metrics from heuristic scores', () => {
@@ -46,6 +47,7 @@ test('detail panel separates measured metrics from heuristic scores', () => {
   assert.match(html, /tag measured/);
   assert.match(html, /tag heuristic/);
   assert.match(html, /Cross-cutting signals/);
+  assert.match(html, /<a href="https:\/\/github.com\/ceph\/ceph\/pull\/61002\/files" data-path="src\/os\/bluestore\/bluestore_types\.cc"/);
   const missing = renderDetail(pr(61013), ctx);
   assert.match(missing, /not been collected/);
 });
@@ -111,4 +113,10 @@ test('relative time formatting', () => {
   assert.equal(relTime(new Date(NOW.getTime() - 3 * 3_600_000).toISOString(), NOW), '3h ago');
   assert.equal(relTime(new Date(NOW.getTime() - 5 * 86400_000).toISOString(), NOW), '5d ago');
   assert.equal(relTime(null, NOW), 'never');
+});
+
+test('file anchors computed in the browser match GitHub diff fragments', async () => {
+  const { createHash } = await import('node:crypto');
+  const path = 'src/os/bluestore/BlueStore.cc';
+  assert.equal(await diffAnchor(path), `diff-${createHash('sha256').update(path).digest('hex')}`);
 });

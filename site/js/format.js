@@ -42,3 +42,12 @@ export function plural(n, word, pluralWord = `${word}s`) {
 export function hoursSince(iso, now = new Date()) {
   return iso ? (now.getTime() - Date.parse(iso)) / 3_600_000 : Infinity;
 }
+
+/**
+ * GitHub "Files changed" fragment for a path: diff-<sha256(path)>. Computed here rather
+ * than shipped in the dataset (hex hashes are incompressible). Needs a secure context.
+ */
+export async function diffAnchor(path) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(path));
+  return 'diff-' + [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}

@@ -1,6 +1,5 @@
 // Assemble the published dataset from collected records: metrics, scores, ranks.
 
-import { createHash } from 'node:crypto';
 import type { ClassificationRules, DashboardConfig } from '../config.ts';
 import type { CollectStats } from '../collect/collector.ts';
 import { allWindowMetrics, lastActivityAt } from '../score/metrics.ts';
@@ -12,11 +11,10 @@ import { comparisonSnapshot, type History, type Snapshot } from './history.ts';
 import { churn } from '../score/classify.ts';
 
 export const SCHEMA_VERSION = 1;
-const OTHER_FILES_SHOWN = 5;
+const OTHER_FILES_SHOWN = 3;
 
+/** Relevant files (backing the classification) come first, then the largest other changes. */
 export interface DatasetFile extends ChangedFile {
-  /** Fragment of the PR "Files changed" page for this file (#diff-<sha256(path)>). */
-  anchor: string;
   relevant: boolean;
 }
 
@@ -40,7 +38,7 @@ export interface DatasetPr {
   totals: { comments: number; reviews: number; commits: number };
   metrics: Record<string, WindowMetrics>;
   trending: TrendingResult & { rank: number | null; previousRank: number | null };
-  technical: Omit<TechnicalResult, 'relevantFiles'> & { relevantFiles: string[] };
+  technical: Omit<TechnicalResult, 'relevantFiles'>;
   files: DatasetFile[];
 }
 
@@ -83,10 +81,6 @@ export function datasetId(now: Date): string {
   return now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 }
 
-export function diffAnchor(path: string): string {
-  return 'diff-' + createHash('sha256').update(path).digest('hex');
-}
-
 function detailState(rec: PrRecord, config: DashboardConfig, now: Date): DatasetPr['detail'] {
   if (rec.detail !== 'full') return 'missing';
   const changed = rec.listUpdatedAt !== undefined && rec.listUpdatedAt !== rec.updatedAt;
@@ -98,8 +92,8 @@ function datasetFiles(rec: PrRecord, relevant: ChangedFile[]): DatasetFile[] {
   const relevantPaths = new Set(relevant.map((f) => f.path));
   const others = rec.files.filter((f) => !relevantPaths.has(f.path)).sort((a, b) => churn(b) - churn(a)).slice(0, OTHER_FILES_SHOWN);
   return [
-    ...relevant.map((f) => ({ ...f, anchor: diffAnchor(f.path), relevant: true })),
-    ...others.map((f) => ({ ...f, anchor: diffAnchor(f.path), relevant: false })),
+    ...relevant.map((f) => ({ ...f, relevant: true })),
+    ...others.map((f) => ({ ...f, relevant: false })),
   ];
 }
 
@@ -117,7 +111,7 @@ export function buildDataset(input: BuildInput): { dataset: Dataset; snapshot: S
   const previous = comparisonSnapshot(history, now);
 
   const prs: DatasetPr[] = records.map((rec, i) => {
-    const tech = technicalImportance(rec, rules, config.importance);
+    const { relevantFiles, ...technical } = technicalImportance(rec, rules, config.importance);
     const prevRank = previous?.prs[rec.number]?.[0];
     return {
       number: rec.number,
@@ -139,8 +133,8 @@ export function buildDataset(input: BuildInput): { dataset: Dataset; snapshot: S
       totals: rec.totals,
       metrics: allWindowMetrics(rec, now, config.windows, config.collection),
       trending: { ...trending[i], rank: rankOf.get(rec.number) ?? null, previousRank: prevRank ? prevRank : null },
-      technical: { ...tech, relevantFiles: tech.relevantFiles.map((f) => f.path) },
-      files: datasetFiles(rec, tech.relevantFiles),
+      technical,
+      files: datasetFiles(rec, relevantFiles),
     };
   });
   prs.sort((a, b) => b.number - a.number);

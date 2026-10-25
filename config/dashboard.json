@@ -71,7 +71,7 @@
     "backportMultiplier": 0.6,
     "mainBranches": ["main", "master"],
     "churn": { "floor": 0.4, "perDecade": 0.2 },
-    "maxRelevantFiles": 15
+    "maxRelevantFiles": 10
   },
   "history": {
     "retentionDays": 14,

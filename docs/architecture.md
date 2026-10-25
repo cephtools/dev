@@ -36,5 +36,10 @@ frontend detect schema changes.
 list); per-PR failures and budget exhaustion produce a partial dataset with explicit notes. The last good
 dataset stays online with a failure banner.
 
+**One round trip to first render.** `build-site.ts` embeds the manifest and status into `index.html`
+and adds a preload hint for the dataset, so the browser starts the (only large) download together with
+the HTML. The dataset avoids incompressible content: per-file GitHub diff anchors (SHA-256 hex) are
+computed in the browser on demand, which keeps the gzipped payload 40% smaller.
+
 **Minimal stack.** Node ≥ 22.18 runs TypeScript directly; the frontend is plain ES modules. Zero runtime
 dependencies; dev dependencies are only `typescript` and `@types/node`.

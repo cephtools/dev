@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { datasetId, diffAnchor } from '../src/dataset/build.ts';
+import { datasetId } from '../src/dataset/build.ts';
 import { appendSnapshot, comparisonSnapshot } from '../src/dataset/history.ts';
 import { publishDataset, readManifest, ValidationError } from '../src/dataset/publish.ts';
 import { validate } from '../src/dataset/validate.ts';
@@ -63,10 +63,9 @@ test('an invalid dataset is rejected and the previous manifest stays intact', ()
   assert.equal(readManifest(dir)!.id, good.id);
 });
 
-test('dataset ids sort chronologically and anchors match GitHub diff fragments', () => {
+test('dataset ids sort chronologically', () => {
   assert.equal(datasetId(new Date('2026-10-25T09:05:03.123Z')), '20261025T090503Z');
   assert.ok(datasetId(new Date('2026-10-25T10:00:00Z')) > datasetId(new Date('2026-10-25T09:59:59Z')));
-  assert.match(diffAnchor('src/os/bluestore/BlueStore.cc'), /^diff-[0-9a-f]{64}$/);
 });
 
 test('history picks a ~24h-old snapshot and trims by retention', () => {

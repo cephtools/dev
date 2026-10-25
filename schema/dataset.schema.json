@@ -165,7 +165,7 @@
         },
         "technical": {
           "type": "object",
-          "required": ["score", "raw", "important", "confidence", "subsystems", "signals", "explanation", "relevantFiles", "coreLines", "flags"],
+          "required": ["score", "raw", "important", "confidence", "subsystems", "signals", "explanation", "coreLines", "flags"],
           "additionalProperties": false,
           "properties": {
             "score": { "type": "integer", "minimum": 0, "maximum": 100 },
@@ -187,7 +187,6 @@
             },
             "signals": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
             "explanation": { "type": "string" },
-            "relevantFiles": { "type": "array", "items": { "type": "string" } },
             "coreLines": { "type": "integer", "minimum": 0 },
             "flags": {
               "type": "object",
@@ -202,12 +201,11 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["path", "additions", "deletions", "anchor", "relevant"],
+            "required": ["path", "additions", "deletions", "relevant"],
             "properties": {
               "path": { "type": "string" },
               "additions": { "type": "integer", "minimum": 0 },
               "deletions": { "type": "integer", "minimum": 0 },
-              "anchor": { "type": "string" },
               "relevant": { "type": "boolean" }
             }
           }

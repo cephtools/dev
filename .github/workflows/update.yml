@@ -1,8 +1,9 @@
 name: Update dashboard
 
-# Collects PR data on a schedule, persists collector state on the data branch and
-# deploys the static site to GitHub Pages. If collection fails, the previous dataset
-# is redeployed with status.json reporting the failure, and the run is marked failed.
+# Collects PR data (on a schedule, on demand, and on pushes that change the site or
+# collector), persists collector state on the data branch and deploys the static site
+# to GitHub Pages. If collection fails, the previous dataset is redeployed with
+# status.json reporting the failure, and the run is marked failed.
 
 on:
   schedule:
@@ -54,10 +55,9 @@ jobs:
             echo "No $DATA_BRANCH branch yet; starting with empty state"
           fi
 
-      # Push events only redeploy the site with the existing data.
+      # Always collect, so deployed data is produced by the code being deployed.
       - name: Collect PR data
         id: collect
-        if: github.event_name != 'push'
         continue-on-error: true
         env:
           # A fine-grained PAT (public repositories, read-only) raises the GraphQL budget
@@ -68,7 +68,7 @@ jobs:
         run: node src/cli/collect.ts --state state ${MAX_DETAILS:+--max-details "$MAX_DETAILS"}
 
       - name: Save collector state
-        if: github.event_name != 'push' && hashFiles('state/public/status.json') != ''
+        if: hashFiles('state/public/status.json') != ''
         env:
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com

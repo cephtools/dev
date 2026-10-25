@@ -153,6 +153,8 @@ Full details, with the live parameters, are on the dashboard's **About / Scoring
 
 - `data/manifest.json` points to an immutable `data/datasets/<id>.json`; the dataset is written and
   validated before the manifest is atomically replaced, so readers never see partial data.
+- The build embeds the manifest and status in `index.html` and preloads the dataset, so a page load is
+  one HTML round trip plus the dataset download (~360 KB gzipped for all open PRs).
 - `data/status.json` records every attempt. If collection fails, the workflow redeploys the last good
   dataset, the dashboard shows a failure banner with the error, and the run is marked failed.
 - A listing that is clearly incomplete is treated as a failure; a failed collection never becomes an empty list.

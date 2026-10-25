@@ -1,6 +1,6 @@
 // DOM glue: load data, keep controls ⇄ URL hash in sync, render the current view.
 
-import { esc } from './format.js';
+import { diffAnchor, esc } from './format.js';
 import { applyFilters, buildHash, DEFAULT_FILTERS, defaultSort, effectiveMin, facets, parseHash, SORTS, sortPrs } from './state.js';
 import { renderAbout, renderBanners, renderDetail, renderEmpty, renderList, renderStatusLine, renderSubsystems } from './render.js';
 
@@ -22,10 +22,33 @@ let state = parseHash(location.hash);
 let limit = PAGE;
 let lastTrigger = null;
 
-async function loadJson(url) {
-  const res = await fetch(url, { cache: 'no-cache' });
+/** Dataset files are immutable (unique id), so they use normal caching; manifest/status are revalidated. */
+async function loadJson(url, revalidate = false) {
+  const res = await fetch(url, revalidate ? { cache: 'no-cache' } : undefined);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   return res.json();
+}
+
+/** Manifest and status embedded by build-site.ts, saving two round trips before the dataset request. */
+function bootData() {
+  const el = document.getElementById('boot');
+  if (!el) return null;
+  try {
+    return JSON.parse(el.textContent);
+  } catch {
+    return null;
+  }
+}
+
+/** Upgrade file links to GitHub's per-file #diff-<sha256(path)> fragment (computed here, not shipped in the dataset). */
+async function upgradeFileLinks(root, prUrl) {
+  for (const a of root.querySelectorAll('a[data-path]')) {
+    try {
+      a.href = `${prUrl}/files#${await diffAnchor(a.dataset.path)}`;
+    } catch {
+      // keep the plain "Files changed" link (e.g. no SubtleCrypto outside a secure context)
+    }
+  }
 }
 
 function ctx() {
@@ -124,6 +147,7 @@ function openDetail(number, trigger) {
   if (!pr) return;
   lastTrigger = trigger ?? null;
   els.dialogContent.innerHTML = renderDetail(pr, ctx());
+  upgradeFileLinks(els.dialogContent, pr.url);
   if (!els.dialog.open) els.dialog.showModal();
   els.dialog.querySelector('.close')?.focus();
   if (state.pr !== number) {
@@ -195,13 +219,18 @@ window.addEventListener('hashchange', () => {
 async function init() {
   syncControls();
   els.view.innerHTML = '<p class="loading" role="status">Loading dataset…</p>';
-  try {
-    status = await loadJson('data/status.json');
-  } catch {
-    status = null; // optional: older deployments may not have it
+  const boot = bootData();
+  status = boot?.status ?? null;
+  if (!boot) {
+    try {
+      status = await loadJson('data/status.json', true);
+    } catch {
+      status = null; // optional: older deployments may not have it
+    }
   }
   try {
-    const manifest = await loadJson('data/manifest.json');
+    const manifest = boot ? boot.manifest : await loadJson('data/manifest.json', true);
+    if (!manifest) throw new Error('no dataset has been published yet');
     if (manifest.schemaVersion !== 1) throw new Error(`unsupported schema version ${manifest.schemaVersion}`);
     dataset = await loadJson(`data/${manifest.dataset}`);
   } catch (err) {

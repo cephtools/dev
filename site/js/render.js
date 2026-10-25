@@ -41,38 +41,59 @@ function rankChange(pr) {
   return `<span class="delta ${up ? 'up' : 'down'}" title="Rank ${previousRank} → ${rank}">${up ? '↑' : '↓'}${Math.abs(d)}<span class="sr-only"> ${up ? 'up' : 'down'} ${Math.abs(d)} places</span></span>`;
 }
 
-function prHeading(pr, dataset, scoreHtml) {
-  return `<div class="card-head">
-    ${scoreHtml}
-    <div class="card-title">
-      <h3><button type="button" class="pr-open" data-pr="${pr.number}" aria-haspopup="dialog"><span class="num">#${pr.number}</span> ${esc(pr.title)}</button></h3>
-      <div class="meta">${pr.author ? `<span class="author">${esc(pr.author)}</span>` : ''}${badges(pr, dataset)}${labelChips(pr)}</div>
-    </div>
-    ${ghLink(pr.url, 'GitHub')}
-  </div>`;
+// Cards are compact rows: title line, one line of key numbers, and (technical view)
+// a one-line explanation. Everything else lives in the detail panel.
+
+const SEP = ' <span class="sep">·</span> ';
+
+/** Join stat fragments so lines wrap only between them, never inside one. */
+function joinBits(bits) {
+  return bits.filter(Boolean).map((b) => `<span class="bit">${b}</span>`).join(SEP);
 }
 
-function stat(label, value, title = '') {
-  return `<div class="stat"${title ? ` title="${esc(title)}"` : ''}><dt>${esc(label)}</dt><dd>${value}</dd></div>`;
+function rowTitle(pr, dataset) {
+  return `<div class="row-title">
+      <h3><button type="button" class="pr-open" data-pr="${pr.number}" aria-haspopup="dialog"><span class="num">#${pr.number}</span> ${esc(pr.title)}</button></h3>
+      ${pr.author ? `<span class="author">${esc(pr.author)}</span>` : ''}${badges(pr, dataset)}${labelChips(pr, 3)}
+    </div>`;
+}
+
+function activityBits(m, win) {
+  const bits = [];
+  if (m.comments) bits.push(`${plural(m.comments, 'comment')}${m.participants ? ` <small>(${plural(m.participants, 'person', 'people')})</small>` : ''}`);
+  if (m.reviews) bits.push(`${plural(m.reviews, 'review')}${m.verdicts ? ` <small>(${m.verdicts} verdict${m.verdicts > 1 ? 's' : ''})</small>` : ''}`);
+  if (m.reviewComments) bits.push(`<span title="Inline (diff) review comments">${num(m.reviewComments)} inline</span>`);
+  if (m.pushes) bits.push(`<span title="Code updates (${plural(m.commits, 'commit')}); a rebase/force-push counts once">${plural(m.pushes, 'push', 'pushes')}</span>`);
+  if (!bits.length) return `<span class="muted">no activity in ${esc(win)}</span>`;
+  return `<span class="win" title="Activity in the selected window">${esc(win)}:</span> ${joinBits(bits)}`;
+}
+
+function sizeBits(pr) {
+  return `<span class="add">+${num(pr.additions)}</span> <span class="del">−${num(pr.deletions)}</span> <small>${plural(pr.changedFiles, 'file')}</small>`;
+}
+
+function lastBits(pr, now) {
+  return `<time datetime="${esc(pr.lastActivityAt ?? '')}" title="Last substantive activity: ${esc(absTime(pr.lastActivityAt))}">${esc(relTime(pr.lastActivityAt, now))}</time>`;
 }
 
 export function renderTrendingCard(pr, ctx) {
   const { dataset, win, now } = ctx;
   const m = windowMetrics(pr, win);
   const t = pr.trending;
-  const score = `<div class="score trend" title="Trending score (heuristic)"><span class="score-num">${esc(t.score)}</span><span class="score-label">trend</span>${rankChange(pr)}</div>`;
-  const flags = t.unusual ? '<span class="badge hot" title="Recent activity far above typical active PRs (median + 3×MAD)">unusual activity</span>' : '';
+  const a = t.acceleration;
+  const flags = [];
+  if (t.unusual) flags.push('<span class="badge hot" title="Recent activity far above typical active PRs (median + 3×MAD)">unusual</span>');
+  if (a.basis === 'own-history' && a.ratio !== null) {
+    if (a.ratio >= 1.5) flags.push(`<span class="badge accel" title="Recent activity vs this PR's own previous weekly pace">${esc(a.ratio)}× usual pace</span>`);
+    else if (a.ratio <= 0.67) flags.push(`<span class="badge slow" title="Recent activity vs this PR's own previous weekly pace">slowing</span>`);
+  }
   return `<article class="card" data-pr="${pr.number}">
-  ${prHeading(pr, dataset, score)}
-  <p class="why">${flags}${t.explanation.map(esc).join(' · ')}</p>
-  <dl class="stats">
-    ${stat(`comments ${win}`, `${num(m.comments)}${m.participants ? ` <small>(${plural(m.participants, 'person', 'people')})</small>` : ''}`)}
-    ${stat(`reviews ${win}`, `${num(m.reviews)}${m.verdicts ? ` <small>(${m.verdicts} verdict${m.verdicts > 1 ? 's' : ''})</small>` : ''}`)}
-    ${stat(`inline ${win}`, num(m.reviewComments), 'Inline (diff) review comments')}
-    ${stat(`pushes ${win}`, `${num(m.pushes)} <small>(${plural(m.commits, 'commit')})</small>`, 'Code updates; a rebase/force-push counts once')}
-    ${stat('size', `<span class="add">+${num(pr.additions)}</span> <span class="del">−${num(pr.deletions)}</span> <small>${plural(pr.changedFiles, 'file')}</small>`)}
-    ${stat('last activity', `<time datetime="${esc(pr.lastActivityAt ?? '')}" title="${esc(absTime(pr.lastActivityAt))}">${esc(relTime(pr.lastActivityAt, now))}</time>`)}
-  </dl>
+  <div class="score trend" title="Trending score (heuristic)"><span class="score-num">${esc(t.score)}</span>${rankChange(pr)}</div>
+  <div class="row-main">
+    ${rowTitle(pr, dataset)}
+    <p class="row-line">${flags.length ? `${flags.join(' ')} ` : ''}${joinBits([activityBits(m, win), sizeBits(pr), lastBits(pr, now)])}</p>
+  </div>
+  ${ghLink(pr.url, 'GitHub')}
 </article>`;
 }
 
@@ -81,32 +102,37 @@ function confidenceChip(conf) {
   return `<span class="conf conf-${esc(conf)}" title="Heuristic classification">${esc(CONF_LABEL[conf])}</span>`;
 }
 
+// Links to the PR's "Files changed" page; app.js upgrades the href to the per-file
+// #diff-<sha256(path)> fragment once computed in the browser (see diffAnchor).
 function fileRow(pr, f) {
-  return `<li><a href="${esc(pr.url)}/files#${esc(f.anchor)}" target="_blank" rel="noopener"><code>${esc(f.path)}</code></a> <span class="add">+${num(f.additions)}</span> <span class="del">−${num(f.deletions)}</span></li>`;
+  return `<li><a href="${esc(pr.url)}/files" data-path="${esc(f.path)}" target="_blank" rel="noopener"><code>${esc(f.path)}</code></a> <span class="add">+${num(f.additions)}</span> <span class="del">−${num(f.deletions)}</span></li>`;
 }
 
 export function renderTechnicalCard(pr, ctx) {
   const { dataset, now } = ctx;
   const t = pr.technical;
-  const score = `<div class="score tech" title="Technical importance (heuristic, 0–100)"><span class="score-num">${esc(t.score)}</span><span class="score-label">impact</span></div>`;
   const subs = t.subsystems
     .map((s) => `<span class="chip sub conf-${esc(s.confidence)}" title="${esc(CONF_LABEL[s.confidence])}; subsystem score ${esc(s.score)}">${esc(subsystemName(dataset, s.id))}</span>`)
-    .join('');
+    .join(' ');
   const d30 = pr.metrics['30d'] ?? windowMetrics(pr, '30d');
-  const quiet = d30 && d30.comments + d30.reviews === 0 ? '<span class="badge quiet" title="No human comments or reviews in 30 days">no discussion in 30d</span>' : '';
-  const files = pr.files.filter((f) => f.relevant).slice(0, 3);
-  const moreFiles = t.relevantFiles.length - files.length;
+  const quiet = d30 && d30.comments + d30.reviews === 0 ? ' <span class="badge quiet" title="No human comments or reviews in 30 days">no discussion in 30d</span>' : '';
+  const relevant = pr.files.filter((f) => f.relevant);
+  const fileBit = relevant.length
+    ? `<code class="path" title="${esc(relevant[0].path)}">${esc(relevant[0].path)}</code>${relevant.length > 1 ? ` <small>+${relevant.length - 1} more</small>` : ''}`
+    : '';
   return `<article class="card" data-pr="${pr.number}">
-  ${prHeading(pr, dataset, score)}
-  <div class="subs">${subs}${confidenceChip(t.confidence)}${quiet}</div>
-  <p class="why">${esc(t.explanation)}</p>
-  ${files.length ? `<ul class="files">${files.map((f) => fileRow(pr, f)).join('')}${moreFiles > 0 ? `<li class="muted">+${moreFiles} more relevant file${moreFiles > 1 ? 's' : ''}</li>` : ''}</ul>` : ''}
-  <dl class="stats">
-    ${stat('core lines', num(t.coreLines), 'Lines changed outside tests, docs and the dashboard frontend')}
-    ${stat('discussion 30d', `${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')}`)}
-    ${stat('trend', esc(pr.trending.score))}
-    ${stat('last activity', `<time datetime="${esc(pr.lastActivityAt ?? '')}">${esc(relTime(pr.lastActivityAt, now))}</time>`)}
-  </dl>
+  <div class="score tech" title="Technical importance (heuristic, 0–100)"><span class="score-num">${esc(t.score)}</span></div>
+  <div class="row-main">
+    ${rowTitle(pr, dataset)}
+    <p class="row-line">${subs} ${confidenceChip(t.confidence)}${quiet}${SEP}${joinBits([
+      `<span title="Lines changed outside tests, docs and the dashboard frontend">${num(t.coreLines)} core lines</span>`,
+      `${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')} <small>in 30d</small>`,
+      lastBits(pr, now),
+      fileBit,
+    ])}</p>
+    <p class="row-why" title="${esc(t.explanation)}">${esc(t.explanation)}</p>
+  </div>
+  ${ghLink(pr.url, 'GitHub')}
 </article>`;
 }
 
