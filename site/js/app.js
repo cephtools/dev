@@ -132,7 +132,7 @@ function render() {
     return;
   }
   const sorted = sortPrs(filtered, view, filters.sort, filters.win);
-  els.count.textContent = `Showing ${Math.min(limit, sorted.length)} of ${sorted.length} PRs`;
+  els.count.textContent = sorted.length ? '' : 'No PRs match';
   els.view.innerHTML = sorted.length ? renderList(sorted, view, ctx(), limit) : renderEmpty(view, isFiltered());
 }
 

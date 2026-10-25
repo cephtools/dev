@@ -20,15 +20,19 @@ function labelChips(pr, max = 4) {
   return shown + more;
 }
 
-function badges(pr, dataset) {
+function badgeList(pr, dataset, includeDraft = false) {
   const out = [];
-  if (pr.isDraft) out.push('<span class="badge draft">Draft</span>');
+  if (includeDraft && pr.isDraft) out.push('<span class="badge draft">Draft</span>');
   const main = dataset.scoring.importance.mainBranches ?? ['main'];
   if (!main.includes(pr.baseRef)) out.push(`<span class="badge backport" title="Targets ${esc(pr.baseRef)}">→ ${esc(pr.baseRef)}</span>`);
   if (pr.detail === 'missing') out.push('<span class="badge warn" title="Activity and files not collected yet">no detail yet</span>');
   if (pr.detail === 'stale') out.push(`<span class="badge warn" title="Details fetched ${esc(absTime(pr.fetchedAt))}; PR changed since">details stale</span>`);
   if (pr.ciState === 'FAILURE' || pr.ciState === 'ERROR') out.push('<span class="badge ci-fail">CI failing</span>');
-  return out.join('');
+  return out;
+}
+
+function badges(pr, dataset) {
+  return badgeList(pr, dataset, true).join('');
 }
 
 function rankChange(pr) {
@@ -41,39 +45,42 @@ function rankChange(pr) {
   return `<span class="delta ${up ? 'up' : 'down'}" title="Rank ${previousRank} → ${rank}">${up ? '↑' : '↓'}${Math.abs(d)}<span class="sr-only"> ${up ? 'up' : 'down'} ${Math.abs(d)} places</span></span>`;
 }
 
-// Cards are compact rows: title line, one line of key numbers, and (technical view)
-// a one-line explanation. Everything else lives in the detail panel.
+// List rows styled after GitHub's own pull-request list: a state icon, a title line
+// with chips, a muted line with number/age/author and view-specific notes, and metrics
+// with icons on the right. Everything else lives in the detail panel.
 
 const SEP = ' <span class="sep">·</span> ';
 
-/** Join stat fragments so lines wrap only between them, never inside one. */
+/** Join fragments so lines wrap only between them, never inside one. */
 function joinBits(bits) {
   return bits.filter(Boolean).map((b) => `<span class="bit">${b}</span>`).join(SEP);
 }
 
-function rowTitle(pr, dataset) {
-  return `<div class="row-title">
-      <h3><button type="button" class="pr-open" data-pr="${pr.number}" aria-haspopup="dialog"><span class="num">#${pr.number}</span> ${esc(pr.title)}</button></h3>
-      ${pr.author ? `<span class="author">${esc(pr.author)}</span>` : ''}${badges(pr, dataset)}${labelChips(pr, 3)}
-    </div>`;
+/** Icons are <symbol>s defined once in index.html. */
+function ico(id) {
+  return `<svg class="ico" aria-hidden="true" viewBox="0 0 16 16"><use href="#${id}"/></svg>`;
 }
 
-function activityBits(m, win) {
-  const bits = [];
-  if (m.comments) bits.push(`${plural(m.comments, 'comment')}${m.participants ? ` <small>(${plural(m.participants, 'person', 'people')})</small>` : ''}`);
-  if (m.reviews) bits.push(`${plural(m.reviews, 'review')}${m.verdicts ? ` <small>(${m.verdicts} verdict${m.verdicts > 1 ? 's' : ''})</small>` : ''}`);
-  if (m.reviewComments) bits.push(`<span title="Inline (diff) review comments">${num(m.reviewComments)} inline</span>`);
-  if (m.pushes) bits.push(`<span title="Code updates (${plural(m.commits, 'commit')}); a rebase/force-push counts once">${plural(m.pushes, 'push', 'pushes')}</span>`);
-  if (!bits.length) return `<span class="muted">no activity in ${esc(win)}</span>`;
-  return `<span class="win" title="Activity in the selected window">${esc(win)}:</span> ${joinBits(bits)}`;
+function stateIcon(pr) {
+  const label = pr.isDraft ? 'Draft pull request' : 'Open pull request';
+  return `<span class="state ${pr.isDraft ? 'draft' : 'open'}" title="${label}">${ico('i-pr')}<span class="sr-only">${label}</span></span>`;
 }
 
-function sizeBits(pr) {
-  return `<span class="add">+${num(pr.additions)}</span> <span class="del">−${num(pr.deletions)}</span> <small>${plural(pr.changedFiles, 'file')}</small>`;
+function metric(id, value, label) {
+  return `<span class="metric" title="${esc(label)}">${ico(id)}${num(value)}<span class="sr-only"> ${esc(label)}</span></span>`;
 }
 
-function lastBits(pr, now) {
-  return `<time datetime="${esc(pr.lastActivityAt ?? '')}" title="Last substantive activity: ${esc(absTime(pr.lastActivityAt))}">${esc(relTime(pr.lastActivityAt, now))}</time>`;
+function rowTitle(pr, chips) {
+  return `<div class="row-title"><h3><button type="button" class="pr-open" data-pr="${pr.number}" aria-haspopup="dialog">${esc(pr.title)}</button></h3>${chips}</div>`;
+}
+
+function rowMeta(pr, now, notes) {
+  const opened = `<a class="pr-num" href="${esc(pr.url)}" target="_blank" rel="noopener" title="Open on GitHub">#${pr.number}</a> opened ${esc(relTime(pr.createdAt, now))}${pr.author ? ` by <span class="author">${esc(pr.author)}</span>` : ''}`;
+  return `<p class="row-meta">${joinBits([opened, ...notes])}</p>`;
+}
+
+function updatedBit(pr, now) {
+  return `updated <time datetime="${esc(pr.lastActivityAt ?? '')}" title="Last substantive activity: ${esc(absTime(pr.lastActivityAt))}">${esc(relTime(pr.lastActivityAt, now))}</time>`;
 }
 
 export function renderTrendingCard(pr, ctx) {
@@ -81,19 +88,24 @@ export function renderTrendingCard(pr, ctx) {
   const m = windowMetrics(pr, win);
   const t = pr.trending;
   const a = t.acceleration;
-  const flags = [];
-  if (t.unusual) flags.push('<span class="badge hot" title="Recent activity far above typical active PRs (median + 3×MAD)">unusual</span>');
+  const notes = [];
+  if (t.unusual) notes.push('<span class="badge hot" title="Recent activity far above typical active PRs (median + 3×MAD)">unusual activity</span>');
   if (a.basis === 'own-history' && a.ratio !== null) {
-    if (a.ratio >= 1.5) flags.push(`<span class="badge accel" title="Recent activity vs this PR's own previous weekly pace">${esc(a.ratio)}× usual pace</span>`);
-    else if (a.ratio <= 0.67) flags.push(`<span class="badge slow" title="Recent activity vs this PR's own previous weekly pace">slowing</span>`);
+    if (a.ratio >= 1.5) notes.push(`<span class="badge accel" title="Recent activity vs this PR's own previous weekly pace">${esc(a.ratio)}× usual pace</span>`);
+    else if (a.ratio <= 0.67) notes.push(`<span class="badge slow" title="Recent activity vs this PR's own previous weekly pace">slowing</span>`);
   }
-  return `<article class="card" data-pr="${pr.number}">
-  <div class="score trend" title="Trending score (heuristic)"><span class="score-num">${esc(t.score)}</span>${rankChange(pr)}</div>
-  <div class="row-main">
-    ${rowTitle(pr, dataset)}
-    <p class="row-line">${flags.length ? `${flags.join(' ')} ` : ''}${joinBits([activityBits(m, win), sizeBits(pr), lastBits(pr, now)])}</p>
-  </div>
-  ${ghLink(pr.url, 'GitHub')}
+  notes.push(...badgeList(pr, dataset), updatedBit(pr, now));
+  const right = [
+    metric('i-comment', m.comments, `${plural(m.comments, 'comment')} in ${win}${m.participants ? ` from ${plural(m.participants, 'person', 'people')}` : ''}`),
+    metric('i-review', m.reviews, `${plural(m.reviews, 'review')} in ${win}${m.reviewComments ? `, ${m.reviewComments} inline comments` : ''}${m.verdicts ? `, ${m.verdicts} approve/request-changes` : ''}`),
+    metric('i-push', m.pushes, `${plural(m.pushes, 'code push', 'code pushes')} in ${win} (${plural(m.commits, 'commit')}); a rebase counts once`),
+    `<span class="metric size" title="${plural(pr.changedFiles, 'file')} changed"><span class="add">+${num(pr.additions)}</span> <span class="del">−${num(pr.deletions)}</span></span>`,
+    `<span class="score trend" title="Trending score (heuristic)">${esc(t.score)}${rankChange(pr)}</span>`,
+  ];
+  return `<article class="row" data-pr="${pr.number}">
+  ${stateIcon(pr)}
+  <div class="row-main">${rowTitle(pr, labelChips(pr, 3))}${rowMeta(pr, now, notes)}</div>
+  <div class="row-right">${right.join('')}</div>
 </article>`;
 }
 
@@ -113,34 +125,34 @@ export function renderTechnicalCard(pr, ctx) {
   const t = pr.technical;
   const subs = t.subsystems
     .map((s) => `<span class="chip sub conf-${esc(s.confidence)}" title="${esc(CONF_LABEL[s.confidence])}; subsystem score ${esc(s.score)}">${esc(subsystemName(dataset, s.id))}</span>`)
-    .join(' ');
+    .join('');
   const d30 = pr.metrics['30d'] ?? windowMetrics(pr, '30d');
-  const quiet = d30 && d30.comments + d30.reviews === 0 ? ' <span class="badge quiet" title="No human comments or reviews in 30 days">no discussion in 30d</span>' : '';
   const relevant = pr.files.filter((f) => f.relevant);
-  const fileBit = relevant.length
-    ? `<code class="path" title="${esc(relevant[0].path)}">${esc(relevant[0].path)}</code>${relevant.length > 1 ? ` <small>+${relevant.length - 1} more</small>` : ''}`
-    : '';
-  return `<article class="card" data-pr="${pr.number}">
-  <div class="score tech" title="Technical importance (heuristic, 0–100)"><span class="score-num">${esc(t.score)}</span></div>
-  <div class="row-main">
-    ${rowTitle(pr, dataset)}
-    <p class="row-line">${subs} ${confidenceChip(t.confidence)}${quiet}${SEP}${joinBits([
-      `<span title="Lines changed outside tests, docs and the dashboard frontend">${num(t.coreLines)} core lines</span>`,
-      `${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')} <small>in 30d</small>`,
-      lastBits(pr, now),
-      fileBit,
-    ])}</p>
-    <p class="row-why" title="${esc(t.explanation)}">${esc(t.explanation)}</p>
-  </div>
-  ${ghLink(pr.url, 'GitHub')}
+  const notes = [confidenceChip(t.confidence)];
+  if (d30 && d30.comments + d30.reviews === 0) notes.push('<span class="badge quiet" title="No human comments or reviews in 30 days">no discussion in 30d</span>');
+  else notes.push(`${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')} in 30d`);
+  notes.push(...badgeList(pr, dataset), updatedBit(pr, now));
+  if (relevant.length) {
+    notes.push(`<code class="path" title="${esc(relevant[0].path)}">${esc(relevant[0].path)}</code>${relevant.length > 1 ? ` <small>+${relevant.length - 1} more</small>` : ''}`);
+  }
+  const right = [
+    metric('i-diff', t.coreLines, 'lines changed outside tests, docs and the dashboard frontend'),
+    `<span class="score tech" title="Technical importance (heuristic, 0–100)">${esc(t.score)}</span>`,
+  ];
+  return `<article class="row" data-pr="${pr.number}">
+  ${stateIcon(pr)}
+  <div class="row-main">${rowTitle(pr, subs)}${rowMeta(pr, now, notes)}<p class="row-why" title="${esc(t.explanation)}">${esc(t.explanation)}</p></div>
+  <div class="row-right">${right.join('')}</div>
 </article>`;
 }
 
 export function renderList(prs, view, ctx, limit) {
-  const card = view === 'technical' ? renderTechnicalCard : renderTrendingCard;
-  const shown = prs.slice(0, limit).map((pr) => card(pr, ctx)).join('\n');
+  const row = view === 'technical' ? renderTechnicalCard : renderTrendingCard;
+  const shown = prs.slice(0, limit).map((pr) => row(pr, ctx)).join('\n');
+  const legend = view === 'technical' ? 'core lines · importance' : `comments · reviews · pushes in ${esc(ctx.win)} · size · trend`;
+  const head = `<div class="list-head"><span>${num(Math.min(limit, prs.length))} of ${num(prs.length)} PRs</span><span class="muted">${legend}</span></div>`;
   const more = prs.length > limit ? `<button type="button" class="more" data-more="1">Show more (${prs.length - limit} remaining)</button>` : '';
-  return `<div class="cards">${shown}</div>${more}`;
+  return `<div class="list">${head}${shown}</div>${more}`;
 }
 
 export function renderEmpty(view, filtered) {

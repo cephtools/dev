@@ -28,7 +28,8 @@ test('trending card shows score, explanation, metrics and GitHub link', () => {
   assert.match(html, /#61001/);
   assert.match(html, new RegExp(`>${pr(61001).trending.score}<`));
   assert.match(html, /href="https:\/\/github.com\/ceph\/ceph\/pull\/61001"/);
-  assert.match(html, /7d:/);
+  assert.match(html, /comments in 7d/);
+  assert.match(html, /class="state open"/);
   assert.match(html, /comments/);
   assert.match(html, /"badge hot"/);
 });
