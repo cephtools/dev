@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cephtools/dev/schema/dataset.schema.json",
+  "title": "Ceph PR Radar dataset",
+  "description": "Published by the collector at data/datasets/<id>.json and referenced from data/manifest.json. Bump schemaVersion on incompatible changes.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "generatedAt", "repo", "site", "collection", "windows", "scoring", "subsystems", "history", "prs"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "integer", "enum": [1] },
+    "id": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "repo": {
+      "type": "object",
+      "required": ["owner", "name", "url"],
+      "properties": { "owner": { "type": "string" }, "name": { "type": "string" }, "url": { "type": "string" } }
+    },
+    "site": {
+      "type": "object",
+      "required": ["title", "refreshHours", "staleAfterHours"],
+      "properties": { "title": { "type": "string" }, "refreshHours": { "type": "number", "minimum": 0 }, "staleAfterHours": { "type": "number", "minimum": 0 } }
+    },
+    "collection": {
+      "type": "object",
+      "required": ["source", "startedAt", "finishedAt", "totalOpen", "listed", "fetched", "failed", "cachedFresh", "stale", "missing", "partial", "notes", "apiCost", "apiRequests", "rateLimitRemaining"],
+      "properties": {
+        "source": { "type": "string", "enum": ["github", "sample"] },
+        "startedAt": { "type": "string" },
+        "finishedAt": { "type": "string" },
+        "totalOpen": { "type": "integer", "minimum": 0 },
+        "listed": { "type": "integer", "minimum": 0 },
+        "fetched": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "array", "items": { "type": "integer" } },
+        "cachedFresh": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "partial": { "type": "boolean" },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "apiCost": { "type": "number", "minimum": 0 },
+        "apiRequests": { "type": "integer", "minimum": 0 },
+        "rateLimitRemaining": { "type": ["integer", "null"] }
+      }
+    },
+    "windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "hours"],
+        "properties": { "key": { "type": "string" }, "hours": { "type": "number", "minimum": 1 } }
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "required": ["trending", "importance", "population"],
+      "properties": {
+        "trending": { "type": "object" },
+        "importance": { "type": "object" },
+        "population": {
+          "type": "object",
+          "required": ["median", "mad", "threshold", "population"],
+          "properties": {
+            "median": { "type": "number" }, "mad": { "type": "number" }, "threshold": { "type": "number" }, "population": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "subsystems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "description"],
+        "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "description": { "type": "string" } }
+      }
+    },
+    "history": {
+      "type": "object",
+      "required": ["comparedTo", "snapshots"],
+      "properties": { "comparedTo": { "type": ["string", "null"] }, "snapshots": { "type": "integer", "minimum": 0 } }
+    },
+    "prs": { "type": "array", "items": { "$ref": "#/$defs/pr" } }
+  },
+  "$defs": {
+    "windowMetrics": {
+      "type": "object",
+      "required": ["comments", "reviews", "verdicts", "reviewComments", "commits", "pushes", "participants"],
+      "additionalProperties": false,
+      "properties": {
+        "comments": { "type": "integer", "minimum": 0 },
+        "reviews": { "type": "integer", "minimum": 0 },
+        "verdicts": { "type": "integer", "minimum": 0 },
+        "reviewComments": { "type": "integer", "minimum": 0 },
+        "commits": { "type": "integer", "minimum": 0 },
+        "pushes": { "type": "integer", "minimum": 0 },
+        "participants": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["type", "detail", "weight"],
+      "properties": {
+        "type": { "type": "string", "enum": ["path", "keyword", "label", "breadth", "signal", "format", "design-doc"] },
+        "detail": { "type": "string" },
+        "weight": { "type": "number" },
+        "files": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+    "pr": {
+      "type": "object",
+      "required": ["number", "title", "url", "author", "isDraft", "baseRef", "labels", "createdAt", "updatedAt", "lastActivityAt", "additions", "deletions", "changedFiles", "ciState", "detail", "fetchedAt", "totals", "metrics", "trending", "technical", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "author": { "type": ["string", "null"] },
+        "isDraft": { "type": "boolean" },
+        "baseRef": { "type": "string" },
+        "labels": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastActivityAt": { "type": ["string", "null"] },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 },
+        "changedFiles": { "type": "integer", "minimum": 0 },
+        "ciState": { "type": ["string", "null"] },
+        "detail": { "type": "string", "enum": ["fresh", "stale", "missing"] },
+        "fetchedAt": { "type": ["string", "null"] },
+        "totals": {
+          "type": "object",
+          "required": ["comments", "reviews", "commits"],
+          "properties": {
+            "comments": { "type": "integer", "minimum": 0 }, "reviews": { "type": "integer", "minimum": 0 }, "commits": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "metrics": { "type": "object", "additionalProperties": { "$ref": "#/$defs/windowMetrics" } },
+        "trending": {
+          "type": "object",
+          "required": ["score", "base", "components", "acceleration", "unusual", "explanation", "rank", "previousRank"],
+          "additionalProperties": false,
+          "properties": {
+            "score": { "type": "number", "minimum": 0 },
+            "base": { "type": "number", "minimum": 0 },
+            "components": {
+              "type": "object",
+              "required": ["discussion", "review", "code"],
+              "properties": { "discussion": { "type": "number", "minimum": 0 }, "review": { "type": "number", "minimum": 0 }, "code": { "type": "number", "minimum": 0 } }
+            },
+            "acceleration": {
+              "type": "object",
+              "required": ["basis", "ratio", "multiplier", "recentWeighted", "baselineWeeklyWeighted"],
+              "properties": {
+                "basis": { "type": "string", "enum": ["own-history", "new-pr", "truncated-history", "no-detail"] },
+                "ratio": { "type": ["number", "null"] },
+                "multiplier": { "type": "number", "minimum": 0 },
+                "recentWeighted": { "type": "number", "minimum": 0 },
+                "baselineWeeklyWeighted": { "type": ["number", "null"] }
+              }
+            },
+            "unusual": { "type": "boolean" },
+            "explanation": { "type": "array", "items": { "type": "string" } },
+            "rank": { "type": ["integer", "null"] },
+            "previousRank": { "type": ["integer", "null"] }
+          }
+        },
+        "technical": {
+          "type": "object",
+          "required": ["score", "raw", "important", "confidence", "subsystems", "signals", "explanation", "relevantFiles", "coreLines", "flags"],
+          "additionalProperties": false,
+          "properties": {
+            "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "raw": { "type": "number", "minimum": 0 },
+            "important": { "type": "boolean" },
+            "confidence": { "type": ["string", "null"], "enum": ["high", "medium", "low", null] },
+            "subsystems": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "score", "confidence", "evidence"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "score": { "type": "number", "minimum": 0 },
+                  "confidence": { "$ref": "#/$defs/confidence" },
+                  "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+                }
+              }
+            },
+            "signals": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+            "explanation": { "type": "string" },
+            "relevantFiles": { "type": "array", "items": { "type": "string" } },
+            "coreLines": { "type": "integer", "minimum": 0 },
+            "flags": {
+              "type": "object",
+              "required": ["backport", "mechanical", "testOnly", "docsOnly", "filesTruncated"],
+              "properties": {
+                "backport": { "type": "boolean" }, "mechanical": { "type": "boolean" }, "testOnly": { "type": "boolean" }, "docsOnly": { "type": "boolean" }, "filesTruncated": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "additions", "deletions", "anchor", "relevant"],
+            "properties": {
+              "path": { "type": "string" },
+              "additions": { "type": "integer", "minimum": 0 },
+              "deletions": { "type": "integer", "minimum": 0 },
+              "anchor": { "type": "string" },
+              "relevant": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

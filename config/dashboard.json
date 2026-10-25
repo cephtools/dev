@@ -1,0 +1,80 @@
+{
+  "repo": { "owner": "ceph", "name": "ceph" },
+  "site": {
+    "title": "Ceph PR Radar",
+    "refreshHours": 3,
+    "staleAfterHours": 9
+  },
+  "collection": {
+    "listPageSize": 100,
+    "detailBatchSize": 10,
+    "detailConcurrency": 4,
+    "maxFilesPerPr": 300,
+    "refreshAfterHours": 48,
+    "maxDetailPrsPerRun": 2000,
+    "bootstrapMaxDetailPrs": 400,
+    "rateLimitReserve": 100,
+    "maxRateLimitWaitSeconds": 120,
+    "maxRetries": 4,
+    "eventRetentionDays": 120,
+    "bodyMaxChars": 4000,
+    "pushClusterMinutes": 30,
+    "botLogins": [
+      "ceph-jenkins",
+      "github-actions",
+      "github-actions[bot]",
+      "dependabot[bot]",
+      "mergify[bot]",
+      "renovate[bot]"
+    ],
+    "ignoreCommentPatterns": [
+      "^\\s*jenkins\\s+(re)?test\\b",
+      "^\\s*jenkins\\s+(retest|rebuild|run)\\b",
+      "^\\s*/(re)?test\\b",
+      "^\\s*retest( this please)?\\s*$"
+    ]
+  },
+  "windows": [
+    { "key": "24h", "hours": 24 },
+    { "key": "7d", "hours": 168 },
+    { "key": "30d", "hours": 720 }
+  ],
+  "trending": {
+    "halfLifeHours": 72,
+    "lookbackDays": 14,
+    "recentDays": 7,
+    "baselineDays": 28,
+    "weights": {
+      "comment": 1.0,
+      "reviewVerdict": 3.0,
+      "reviewSummary": 1.5,
+      "reviewInlineComment": 0.5,
+      "reviewInlineCapPerReview": 10,
+      "push": 2.0,
+      "pushesPerDayCap": 2,
+      "participant": 1.0,
+      "participantCap": 10
+    },
+    "sizeFactor": { "perDecade": 0.08, "max": 0.25 },
+    "acceleration": { "slope": 0.3, "min": 0.75, "max": 1.75, "minBaselineDays": 14 },
+    "unusual": { "madMultiplier": 3, "minWeightedEvents": 10 }
+  },
+  "importance": {
+    "minScore": 30,
+    "scale": 40,
+    "assignThreshold": 10,
+    "keywordCap": 12,
+    "labelCap": 10,
+    "secondarySubsystemWeight": 0.25,
+    "secondarySubsystemCap": 12,
+    "mechanicalMultiplier": 0.6,
+    "backportMultiplier": 0.6,
+    "mainBranches": ["main", "master"],
+    "churn": { "floor": 0.4, "perDecade": 0.2 },
+    "maxRelevantFiles": 15
+  },
+  "history": {
+    "retentionDays": 14,
+    "keepDatasets": 5
+  }
+}

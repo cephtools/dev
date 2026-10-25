@@ -1,0 +1,283 @@
+{
+  "description": "Representative open PRs, expressed relative to 'now'. Expanded into raw GraphQL nodes by src/sample/expand.ts. PR numbers, authors and content are synthetic.",
+  "prs": [
+    {
+      "_comment": "Highly discussed, limited architectural impact (dashboard frontend).",
+      "number": 61001,
+      "title": "mgr/dashboard: redesign the cluster overview page",
+      "author": "uidev",
+      "createdDaysAgo": 25,
+      "labels": ["dashboard", "feature"],
+      "body": "New landing page layout with capacity and health widgets. Screenshots attached.",
+      "files": [
+        ["src/pybind/mgr/dashboard/frontend/src/app/ceph/dashboard-v3/dashboard/dashboard-v3.component.html", 420, 310],
+        ["src/pybind/mgr/dashboard/frontend/src/app/ceph/dashboard-v3/dashboard/dashboard-v3.component.ts", 380, 120],
+        ["src/pybind/mgr/dashboard/frontend/src/app/ceph/dashboard-v3/dashboard/dashboard-v3.component.scss", 210, 90],
+        ["src/pybind/mgr/dashboard/frontend/src/app/shared/api/health.service.ts", 40, 6],
+        ["src/pybind/mgr/dashboard/controllers/health.py", 35, 10],
+        ["src/pybind/mgr/dashboard/openapi.yaml", 60, 0]
+      ],
+      "comments": [
+        { "author": "uidev", "hoursAgo": 520 },
+        { "repeat": 32, "authors": ["rev-a", "rev-b", "uidev", "rev-c", "pm-d", "rev-e"], "startHoursAgo": 1, "everyHours": 3.5 }
+      ],
+      "reviews": [
+        { "author": "rev-a", "hoursAgo": 6, "state": "CHANGES_REQUESTED", "inline": 9, "body": "A few layout issues on narrow screens." },
+        { "author": "rev-b", "hoursAgo": 20, "state": "COMMENTED", "inline": 6 },
+        { "author": "rev-c", "hoursAgo": 40, "state": "COMMENTED", "inline": 4, "body": "Nice." },
+        { "author": "rev-e", "hoursAgo": 70, "state": "APPROVED", "inline": 0 }
+      ],
+      "commits": [ { "hoursAgo": 500, "count": 4 }, { "hoursAgo": 30, "count": 2 }, { "hoursAgo": 8, "count": 1 } ],
+      "forcePushesHoursAgo": [30, 8, 55]
+    },
+    {
+      "_comment": "Low discussion, critical BlueStore on-disk metadata path.",
+      "number": 61002,
+      "title": "os/bluestore: encode blob extents compactly in the onode to cut metadata size",
+      "author": "storagedev",
+      "createdDaysAgo": 12,
+      "labels": ["bluestore", "core"],
+      "body": "Introduces a compact extent encoding for bluestore_blob_t and bumps struct_v. Old onodes are decoded with the previous format; new writes use the compact one. Upgrade path tested with ceph-objectstore-tool. Reduces onode size by ~35% for 4K random-write workloads, which lowers RocksDB write amplification.",
+      "files": [
+        ["src/os/bluestore/bluestore_types.h", 180, 40],
+        ["src/os/bluestore/bluestore_types.cc", 320, 90],
+        ["src/os/bluestore/BlueStore.cc", 150, 60],
+        ["src/test/objectstore/store_test.cc", 240, 0],
+        ["src/test/objectstore/test_bluestore_types.cc", 130, 4]
+      ],
+      "commits": [ { "hoursAgo": 220, "count": 3 } ],
+      "forcePushesHoursAgo": [220]
+    },
+    {
+      "_comment": "Crimson SeaStore cache sharding; modest discussion.",
+      "number": 61003,
+      "title": "crimson/os/seastore: make the LBA cache shard-local and avoid cross-core submit_to",
+      "author": "crimsondev",
+      "createdDaysAgo": 18,
+      "labels": ["crimson"],
+      "body": "Each reactor now owns its slice of the extent cache, removing the submit_to hop on the read path.",
+      "files": [
+        ["src/crimson/os/seastore/cache.cc", 210, 140],
+        ["src/crimson/os/seastore/cache.h", 90, 45],
+        ["src/crimson/os/seastore/lba_manager/btree/lba_btree_node.h", 30, 12],
+        ["src/crimson/osd/shard_services.cc", 40, 22]
+      ],
+      "comments": [ { "author": "crimson-rev", "hoursAgo": 70 }, { "author": "crimsondev", "hoursAgo": 66 } ],
+      "reviews": [ { "author": "crimson-rev", "hoursAgo": 72, "state": "COMMENTED", "inline": 3 } ],
+      "commits": [ { "hoursAgo": 60, "count": 2 } ],
+      "forcePushesHoursAgo": [60]
+    },
+    {
+      "_comment": "RocksDB tuning with a measured performance claim.",
+      "number": 61004,
+      "title": "kv/RocksDBStore: tune level compaction for omap-heavy workloads",
+      "author": "kvdev",
+      "createdDaysAgo": 9,
+      "labels": ["performance"],
+      "body": "Changes the default compaction style for the omap column family. In an RGW bucket-index benchmark this gives 30% lower write amplification and better p99 latency.",
+      "files": [
+        ["src/kv/RocksDBStore.cc", 60, 12],
+        ["src/kv/RocksDBStore.h", 8, 2],
+        ["src/common/options/global.yaml.in", 20, 4]
+      ],
+      "comments": [ { "author": "rgw-perf", "hoursAgo": 50 } ],
+      "commits": [ { "hoursAgo": 200, "count": 1 } ]
+    },
+    {
+      "_comment": "Multiple subsystems: OSD EC read path + buffer ownership (memory).",
+      "number": 61005,
+      "title": "osd/ECBackend: avoid bufferlist copies on the EC read path and shorten PG lock hold time",
+      "author": "ecdev",
+      "createdDaysAgo": 15,
+      "labels": ["performance", "core"],
+      "body": "Reads now splice shard buffers instead of copying them; ownership of the raw buffers moves to the read op. Lock contention on the PG lock is reduced by completing reads outside the lock.",
+      "files": [
+        ["src/osd/ECBackend.cc", 140, 95],
+        ["src/osd/ECCommon.cc", 80, 40],
+        ["src/osd/ECCommon.h", 25, 8],
+        ["src/common/buffer.cc", 45, 10],
+        ["src/include/buffer.h", 18, 2],
+        ["src/test/bufferlist.cc", 60, 0]
+      ],
+      "comments": [ { "author": "osd-rev", "hoursAgo": 100 }, { "author": "ecdev", "hoursAgo": 98 }, { "author": "osd-rev", "hoursAgo": 30 } ],
+      "commits": [ { "hoursAgo": 96, "count": 2 } ],
+      "forcePushesHoursAgo": [96]
+    },
+    {
+      "_comment": "Docs only.",
+      "number": 61006,
+      "title": "doc/cephadm: fix typos in the upgrade guide",
+      "author": "docwriter",
+      "createdDaysAgo": 1,
+      "labels": ["documentation"],
+      "files": [ ["doc/cephadm/upgrade.rst", 6, 6] ],
+      "comments": [ { "author": "doc-rev", "hoursAgo": 4 }, { "author": "docwriter", "hoursAgo": 3 } ],
+      "reviews": [ { "author": "doc-rev", "hoursAgo": 2, "state": "APPROVED" } ],
+      "commits": [ { "hoursAgo": 20, "count": 1 } ]
+    },
+    {
+      "_comment": "Test-only change whose title mentions a critical subsystem.",
+      "number": 61007,
+      "title": "qa/suites/rados: add a thrash test for the bluestore allocator",
+      "author": "qadev",
+      "createdDaysAgo": 6,
+      "labels": ["tests"],
+      "files": [
+        ["qa/suites/rados/thrash/objectstore/bluestore-hybrid.yaml", 30, 0],
+        ["qa/tasks/thrashosds.py", 25, 3]
+      ],
+      "commits": [ { "hoursAgo": 140, "count": 1 } ]
+    },
+    {
+      "_comment": "Backport of a BlueStore allocator fix.",
+      "number": 61008,
+      "title": "squid: os/bluestore: fix fragmentation accounting in AvlAllocator",
+      "author": "backporter",
+      "createdDaysAgo": 3,
+      "base": "squid",
+      "labels": ["bluestore", "squid"],
+      "body": "backport of https://github.com/ceph/ceph/pull/60123",
+      "files": [ ["src/os/bluestore/AvlAllocator.cc", 22, 9], ["src/os/bluestore/AvlAllocator.h", 3, 1] ],
+      "commits": [ { "hoursAgo": 70, "count": 1 } ]
+    },
+    {
+      "_comment": "Long-lived, very large, many lifetime comments, quiet now. Comment connection truncated at 100.",
+      "number": 60420,
+      "title": "rgw: multisite sync policy engine v2",
+      "author": "rgwdev",
+      "createdDaysAgo": 700,
+      "labels": ["rgw", "feature"],
+      "body": "Large rework of multisite sync policy evaluation.",
+      "files": [
+        ["src/rgw/driver/rados/rgw_sync_policy.cc", 2400, 900],
+        ["src/rgw/driver/rados/rgw_sync_policy.h", 600, 120],
+        ["src/rgw/driver/rados/rgw_data_sync.cc", 1800, 1100],
+        ["src/rgw/rgw_bucket_sync.cc", 900, 400],
+        ["src/rgw/rgw_rest_sync_policy.cc", 500, 50],
+        ["src/test/rgw/test_rgw_sync_policy.cc", 1200, 0]
+      ],
+      "comments": [
+        { "repeat": 99, "authors": ["rgw-a", "rgw-b", "rgwdev", "rgw-c"], "startHoursAgo": 800, "everyHours": 90 },
+        { "author": "rgw-a", "hoursAgo": 120 }
+      ],
+      "reviews": [ { "author": "rgw-b", "hoursAgo": 2000, "state": "CHANGES_REQUESTED", "inline": 40 } ],
+      "commits": [ { "hoursAgo": 1500, "count": 30 } ],
+      "totals": { "comments": 231, "reviews": 57, "commits": 64 }
+    },
+    {
+      "_comment": "New draft with a burst of activity; no baseline yet.",
+      "number": 61010,
+      "title": "msg/async: rework ProtocolV2 frame handling for zero-copy receive",
+      "author": "netdev",
+      "createdDaysAgo": 2,
+      "draft": true,
+      "labels": ["core"],
+      "body": "RFC. Receives frame segments directly into pre-allocated buffers; changes buffer ownership between the connection and the dispatcher.",
+      "files": [
+        ["src/msg/async/ProtocolV2.cc", 380, 210],
+        ["src/msg/async/frames_v2.h", 60, 25],
+        ["src/msg/async/frames_v2.cc", 45, 20],
+        ["src/msg/Message.h", 12, 3],
+        ["src/include/buffer.h", 20, 0]
+      ],
+      "comments": [ { "repeat": 8, "authors": ["msgr-a", "netdev", "msgr-b"], "startHoursAgo": 2, "everyHours": 5 } ],
+      "reviews": [
+        { "author": "msgr-a", "hoursAgo": 10, "state": "COMMENTED", "inline": 7, "body": "Concerned about ownership when the connection resets." },
+        { "author": "msgr-b", "hoursAgo": 30, "state": "COMMENTED", "inline": 3 }
+      ],
+      "commits": [ { "hoursAgo": 45, "count": 3 }, { "hoursAgo": 26, "count": 1 }, { "hoursAgo": 12, "count": 1 }, { "hoursAgo": 3, "count": 1 } ],
+      "forcePushesHoursAgo": [26, 12, 3]
+    },
+    {
+      "_comment": "RocksDB submodule bump: tiny diff, large implication.",
+      "number": 61011,
+      "title": "build: update rocksdb submodule to 9.7",
+      "author": "builddev",
+      "createdDaysAgo": 5,
+      "labels": ["build/ops"],
+      "body": "Picks up compaction fixes and a WAL recycling change.",
+      "files": [ ["src/rocksdb", 1, 1] ],
+      "commits": [ { "hoursAgo": 120, "count": 1 } ]
+    },
+    {
+      "_comment": "Trivial change.",
+      "number": 61012,
+      "title": "common: fix typo in a debug log message",
+      "author": "newcontrib",
+      "createdDaysAgo": 4,
+      "files": [ ["src/common/ceph_context.cc", 1, 1] ],
+      "commits": [ { "hoursAgo": 96, "count": 1 } ]
+    },
+    {
+      "_comment": "Detail not collected yet (list-only stub).",
+      "number": 61013,
+      "title": "mon/OSDMonitor: validate pool snapshot ids on creation",
+      "author": "mondev",
+      "createdDaysAgo": 1,
+      "labels": ["mon"],
+      "files": [ ["src/mon/OSDMonitor.cc", 30, 4] ],
+      "listOnly": true
+    },
+    {
+      "_comment": "Noise: CI trigger comments and bot comments only.",
+      "number": 61014,
+      "title": "librbd: fix flaky migration test",
+      "author": "rbddev",
+      "createdDaysAgo": 10,
+      "labels": ["rbd", "tests"],
+      "files": [ ["src/test/librbd/test_Migration.cc", 12, 4] ],
+      "comments": [
+        { "repeat": 12, "authors": ["rbddev"], "startHoursAgo": 1, "everyHours": 6, "body": "jenkins test make check" },
+        { "repeat": 10, "authors": ["ceph-jenkins"], "startHoursAgo": 2, "everyHours": 7, "body": "Build failed: see logs", "bot": true }
+      ],
+      "commits": [ { "hoursAgo": 100, "count": 1 } ]
+    },
+    {
+      "_comment": "Low discussion, cross-subsystem architectural change with a design doc.",
+      "number": 61015,
+      "title": "os: introduce ObjectStore::Transaction v2 interface with explicit ordering semantics",
+      "author": "archdev",
+      "createdDaysAgo": 20,
+      "labels": ["core"],
+      "body": "Design doc: doc/dev/objectstore/transaction-v2.rst. Introduces a new interface separating ordering from durability, implemented for BlueStore and Crimson's FuturizedStore; the encoding stays backward compatible.",
+      "files": [
+        ["src/os/ObjectStore.h", 210, 80],
+        ["src/os/Transaction.h", 340, 120],
+        ["src/os/Transaction.cc", 260, 60],
+        ["src/os/bluestore/BlueStore.cc", 180, 90],
+        ["src/osd/PrimaryLogPG.cc", 70, 40],
+        ["src/crimson/os/futurized_store.h", 50, 10],
+        ["src/crimson/os/seastore/seastore.cc", 90, 30],
+        ["doc/dev/objectstore/transaction-v2.rst", 180, 0],
+        ["src/test/objectstore/store_test.cc", 300, 20]
+      ],
+      "commits": [ { "hoursAgo": 300, "count": 6 } ],
+      "forcePushesHoursAgo": [300]
+    },
+    {
+      "_comment": "Older PR whose activity suddenly accelerated.",
+      "number": 61016,
+      "title": "osd/scheduler: fix mClock cost calculation for recovery ops",
+      "author": "schedev",
+      "createdDaysAgo": 120,
+      "labels": ["performance"],
+      "body": "Recovery ops were charged as client I/O, starving backfill under load.",
+      "files": [
+        ["src/osd/scheduler/mClockScheduler.cc", 45, 20],
+        ["src/osd/scheduler/mClockScheduler.h", 10, 2]
+      ],
+      "comments": [
+        { "author": "sched-rev", "hoursAgo": 900 },
+        { "author": "schedev", "hoursAgo": 700 },
+        { "repeat": 10, "authors": ["sched-rev", "osd-lead", "schedev", "perf-qa"], "startHoursAgo": 2, "everyHours": 6 }
+      ],
+      "reviews": [
+        { "author": "osd-lead", "hoursAgo": 12, "state": "APPROVED", "body": "Matches what we saw in the lab." },
+        { "author": "sched-rev", "hoursAgo": 20, "state": "CHANGES_REQUESTED", "inline": 4, "body": "Please add a unit test." },
+        { "author": "perf-qa", "hoursAgo": 40, "state": "COMMENTED", "inline": 2 }
+      ],
+      "commits": [ { "hoursAgo": 1000, "count": 2 }, { "hoursAgo": 16, "count": 1 } ],
+      "forcePushesHoursAgo": [16]
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "$comment": "Classification rules. Within one subsystem each file is attributed to the FIRST path rule it matches, so list specific rules before general ones. Patterns are globs: '*' matches within a path segment, '**' across segments. Keyword patterns are case-insensitive regular expressions matched against the title (full weight) and description (half weight).",
+  "excludePaths": {
+    "tests": ["qa/**", "src/test/**", "src/crimson/tools/**", "**/tests/**", "**/test_*.py", "**/*_test.cc"],
+    "docs": ["doc/**", "**/*.md", "**/*.rst", "PendingReleaseNotes"],
+    "frontend": ["src/pybind/mgr/dashboard/frontend/**"]
+  },
+  "designDocPaths": ["doc/dev/**"],
+  "formatPaths": [
+    "src/include/denc.h",
+    "src/include/encoding.h",
+    "src/include/rados.h",
+    "src/include/ceph_features.h",
+    "src/os/bluestore/bluestore_types.*",
+    "src/os/bluestore/bluefs_types.*",
+    "src/osd/osd_types.*",
+    "src/osd/OSDMap.*",
+    "src/osd/ECUtil.*",
+    "src/crimson/os/seastore/seastore_types.*",
+    "src/crimson/os/seastore/**/*_types.*",
+    "src/messages/**",
+    "src/msg/async/frames_v2.*"
+  ],
+  "coreAreas": {
+    "$comment": "Top-level areas used to measure breadth of a change. A non-test file counts toward the first area whose prefix matches.",
+    "prefixes": [
+      "src/os/bluestore/", "src/os/", "src/kv/", "src/crimson/os/", "src/crimson/osd/", "src/crimson/net/", "src/crimson/",
+      "src/osd/", "src/msg/", "src/messages/", "src/mon/", "src/common/", "src/include/", "src/erasure-code/",
+      "src/osdc/", "src/librados/", "src/mds/", "src/client/", "src/rgw/", "src/librbd/", "src/mgr/"
+    ],
+    "minLinesPerArea": 30,
+    "breadthThreshold": 4,
+    "breadthWeightPerArea": 3,
+    "breadthMax": 15
+  },
+  "mechanicalTitlePattern": "\\b(move[sd]?|rename[sd]?|clean ?ups?|no functional change|nfc|whitespace|cosmetic|typos?|reformat\\w*|header bloat)\\b",
+  "signals": [
+    {
+      "id": "regression-risk",
+      "description": "Mentions a regression, corruption, data loss or crash",
+      "pattern": "\\b(regression(?!\\s+(tests?|testing|suites?))|corrupt(ion|ed)?|data[- ]loss|lost data|use[- ]after[- ]free|crash(es|ed)?(?!\\s+tests?)|assert(ion)? fail\\w*|deadlock|livelock|race condition)\\b",
+      "weight": 6
+    },
+    {
+      "id": "compatibility",
+      "description": "Mentions compatibility, upgrade or on-disk/wire format",
+      "pattern": "\\b(backward[s]?[- ]compat\\w*|forward[- ]compat\\w*|incompat\\w*|upgrades?|on[- ]?disk format|wire format|feature bit|encoding version|struct_v)\\b",
+      "weight": 6
+    },
+    {
+      "id": "concurrency",
+      "description": "Mentions locking, threading or concurrency changes",
+      "pattern": "\\b(lock(ing|s|less)?|mutex(es)?|contention|concurren\\w+|thread(s|ing)?|atomic(s|ally)?|memory order(ing)?|shard(s|ed|ing)?)\\b",
+      "weight": 4
+    },
+    {
+      "id": "performance-claim",
+      "description": "Describes a measured performance change",
+      "pattern": "(\\b\\d+(\\.\\d+)?\\s*%\\s*(faster|improvement|reduction|less|more|higher|lower)|\\b(iops|throughput|p99|tail latency|latency)\\b)",
+      "weight": 4
+    }
+  ],
+  "subsystems": [
+    {
+      "id": "bluestore",
+      "name": "BlueStore",
+      "description": "On-disk layout, blobs/extents, allocation, checksums/compression, BlueFS and the BlueStore write path.",
+      "paths": [
+        { "pattern": "src/os/bluestore/bluestore_types.*", "weight": 26, "note": "on-disk metadata types and encoding" },
+        { "pattern": "src/os/bluestore/bluefs_types.*", "weight": 22, "note": "BlueFS on-disk types" },
+        { "pattern": "src/os/bluestore/BlueStore.{cc,h}", "weight": 22, "note": "core BlueStore object store (write path, transactions, onode cache)" },
+        { "pattern": "src/os/bluestore/BlueFS.{cc,h}", "weight": 20, "note": "BlueFS (RocksDB's file system, metadata I/O)" },
+        { "pattern": "src/os/bluestore/*Allocator*", "weight": 18, "note": "space allocator" },
+        { "pattern": "src/os/bluestore/fastbmap_allocator*", "weight": 18, "note": "bitmap allocator implementation" },
+        { "pattern": "src/os/bluestore/{Writer,Compression,bluestore_tool,BlueStore_debug}*", "weight": 14, "note": "write/compression helpers and tooling" },
+        { "pattern": "src/os/bluestore/BlueRocksEnv.*", "weight": 14, "note": "RocksDB environment on BlueFS" },
+        { "pattern": "src/os/bluestore/**", "weight": 10, "note": "other BlueStore code" },
+        { "pattern": "src/common/Checksummer.h", "weight": 12, "note": "checksum implementation" },
+        { "pattern": "src/compressor/**", "weight": 6, "note": "compression plugins" }
+      ],
+      "keywords": [
+        { "pattern": "\\bblue ?store\\b", "weight": 6 },
+        { "pattern": "\\bbluefs\\b", "weight": 6 },
+        { "pattern": "\\b(onode|blob|extent|spanning blob|shared blob)s?\\b", "weight": 4 },
+        { "pattern": "\\b(allocator|allocation|fragmentation|min_alloc_size)\\b", "weight": 3 },
+        { "pattern": "\\b(checksum|csum|crc32c|compression)\\b", "weight": 3 },
+        { "pattern": "\\bdeferred (write|io)s?\\b", "weight": 3 }
+      ],
+      "labels": [ { "name": "bluestore", "weight": 8 } ]
+    },
+    {
+      "id": "rocksdb",
+      "name": "RocksDB & metadata",
+      "description": "RocksDB integration and tuning, WAL/compaction, OMAP and key-value metadata performance.",
+      "paths": [
+        { "pattern": "src/rocksdb", "weight": 24, "note": "RocksDB submodule bump" },
+        { "pattern": "src/kv/RocksDBStore.*", "weight": 22, "note": "RocksDB key-value store backend" },
+        { "pattern": "src/kv/KeyValueDB.*", "weight": 20, "note": "key-value storage-engine interface" },
+        { "pattern": "src/kv/**", "weight": 12, "note": "key-value layer" },
+        { "pattern": "src/os/bluestore/BlueRocksEnv.*", "weight": 14, "note": "RocksDB environment on BlueFS" },
+        { "pattern": "src/os/bluestore/BlueFS.{cc,h}", "weight": 8, "note": "BlueFS (RocksDB WAL/SST I/O)" },
+        { "pattern": "src/os/kstore/**", "weight": 8, "note": "KStore" },
+        { "pattern": "src/tools/ceph_kvstore_tool.*", "weight": 6, "note": "kvstore tool" }
+      ],
+      "keywords": [
+        { "pattern": "\\brocks ?db\\b", "weight": 6 },
+        { "pattern": "\\b(compaction|write amplification|read amplification|column famil(y|ies)|sst)\\b", "weight": 5 },
+        { "pattern": "\\bomap\\b", "weight": 4 },
+        { "pattern": "\\b(wal|memtable|bloom filter|block cache)\\b", "weight": 3 },
+        { "pattern": "\\bkv ?store|key[- ]value\\b", "weight": 3 }
+      ],
+      "labels": [ { "name": "rocksdb", "weight": 8 } ]
+    },
+    {
+      "id": "crimson",
+      "name": "Crimson & Seastar",
+      "description": "Crimson OSD, SeaStore, sharded execution, cross-core messaging, async I/O, messenger and SPDK integration.",
+      "paths": [
+        { "pattern": "src/crimson/os/seastore/**/*_types.*", "weight": 24, "note": "SeaStore on-disk types" },
+        { "pattern": "src/crimson/os/seastore/{transaction_manager,cache,journal,extent_placement_manager,async_cleaner}*", "weight": 22, "note": "SeaStore transaction/cache/journal core" },
+        { "pattern": "src/crimson/os/seastore/**", "weight": 16, "note": "SeaStore storage engine" },
+        { "pattern": "src/crimson/os/alienstore/**", "weight": 14, "note": "AlienStore (BlueStore inside Crimson)" },
+        { "pattern": "src/crimson/osd/{pg,osd,shard_services,pg_shard_manager,osd_operation_sequencer}*", "weight": 20, "note": "Crimson OSD core / sharding" },
+        { "pattern": "src/crimson/osd/**", "weight": 14, "note": "Crimson OSD" },
+        { "pattern": "src/crimson/net/**", "weight": 14, "note": "Crimson messenger" },
+        { "pattern": "src/crimson/common/{smp_helpers,interruptible_future,operation}*", "weight": 16, "note": "cross-core execution primitives" },
+        { "pattern": "src/crimson/**", "weight": 8, "note": "other Crimson code" },
+        { "pattern": "src/seastar", "weight": 20, "note": "Seastar submodule bump" },
+        { "pattern": "src/spdk", "weight": 14, "note": "SPDK submodule bump" }
+      ],
+      "keywords": [
+        { "pattern": "\\bcrimson\\b", "weight": 6 },
+        { "pattern": "\\bsea ?(store|star)\\b", "weight": 6 },
+        { "pattern": "\\b(reactor|smp|cross[- ]core|submit_to|invoke_on|shard[- ]?(local|manager|services))\\b", "weight": 4 },
+        { "pattern": "\\b(spdk|io_uring|alien ?store|cyan ?store)\\b", "weight": 4 }
+      ],
+      "labels": [ { "name": "crimson", "weight": 8 } ]
+    },
+    {
+      "id": "osd-perf",
+      "name": "OSD performance",
+      "description": "Replicated/EC I/O paths, messenger, threading/locking, scheduling, recovery/backfill/peering performance.",
+      "paths": [
+        { "pattern": "src/osd/{PrimaryLogPG,ReplicatedBackend,PGBackend}.*", "weight": 20, "note": "replicated I/O path" },
+        { "pattern": "src/osd/{ECBackend,ECCommon,ECUtil,ECTransaction,ECSwitch,ECExtentCache,ECInject}*", "weight": 20, "note": "erasure-coded I/O path" },
+        { "pattern": "src/osd/{PeeringState,PG,PGLog,PGRecovery}.*", "weight": 16, "note": "peering / recovery / PG log" },
+        { "pattern": "src/osd/OSD.{cc,h}", "weight": 16, "note": "OSD daemon, op queues and sharding" },
+        { "pattern": "src/osd/scheduler/**", "weight": 16, "note": "op scheduler (mClock/WPQ)" },
+        { "pattern": "src/osd/scrubber/**", "weight": 8, "note": "scrubber" },
+        { "pattern": "src/osd/**", "weight": 10, "note": "other OSD code" },
+        { "pattern": "src/msg/async/{AsyncConnection,ProtocolV2,Event*,Stack,PosixStack,rdma}*", "weight": 16, "note": "async messenger hot path" },
+        { "pattern": "src/msg/**", "weight": 10, "note": "messenger" },
+        { "pattern": "src/erasure-code/**", "weight": 10, "note": "erasure-code plugins" },
+        { "pattern": "src/common/{WorkQueue,ceph_mutex,mutex_debug,shunique_lock,Throttle,Finisher,ceph_timer}*", "weight": 14, "note": "threading / locking primitives" },
+        { "pattern": "src/os/ObjectStore.*", "weight": 10, "note": "ObjectStore interface used by OSD" }
+      ],
+      "keywords": [
+        { "pattern": "\\b(perf(ormance)?|latency|throughput|iops|cpu|optimi[sz](e|ation)|speed ?up|hot path|fast path)\\b", "weight": 5 },
+        { "pattern": "\\b(contention|lock(ing)?|mutex|thread(ing)?|op ?queue|mclock|wpq)\\b", "weight": 4 },
+        { "pattern": "\\b(recovery|backfill|peering|pglog)\\b", "weight": 3 },
+        { "pattern": "\\b(erasure[- ]cod(e|ed|ing)|\\bec\\b|replicated)\\b", "weight": 3 },
+        { "pattern": "\\bmessenger|msgr\\b", "weight": 3 }
+      ],
+      "labels": [ { "name": "performance", "weight": 8 }, { "name": "core", "weight": 3 } ]
+    },
+    {
+      "id": "memory",
+      "name": "Memory management",
+      "description": "Allocation, caches and eviction, buffer lifetime/refcounting, leaks, fragmentation, memory pressure.",
+      "paths": [
+        { "pattern": "src/include/buffer.h", "weight": 22, "note": "bufferlist / buffer::ptr API" },
+        { "pattern": "src/include/buffer_raw.h", "weight": 20, "note": "raw buffer ownership" },
+        { "pattern": "src/common/buffer.cc", "weight": 22, "note": "bufferlist implementation" },
+        { "pattern": "src/include/mempool.h", "weight": 20, "note": "mempool accounting" },
+        { "pattern": "src/common/mempool.cc", "weight": 18, "note": "mempool accounting" },
+        { "pattern": "src/common/PriorityCache.*", "weight": 20, "note": "priority cache / autotuning against osd_memory_target" },
+        { "pattern": "src/os/bluestore/BlueStore.{cc,h}", "weight": 6, "note": "BlueStore onode/buffer caches" },
+        { "pattern": "src/common/{shared_cache,simple_cache,lru_map,intrusive_lru}*", "weight": 14, "note": "generic caches" },
+        { "pattern": "src/include/{lru,xlist,intarith}.h", "weight": 8, "note": "cache primitives" },
+        { "pattern": "src/perfglue/**", "weight": 12, "note": "heap profiler / allocator glue" },
+        { "pattern": "src/common/{tcmalloc,TrackedOp}*", "weight": 8, "note": "allocator integration / op tracking" },
+        { "pattern": "src/include/intrusive_ptr*", "weight": 8, "note": "reference counting" },
+        { "pattern": "src/common/RefCountedObj.*", "weight": 14, "note": "reference counting" }
+      ],
+      "keywords": [
+        { "pattern": "\\b(memory|mem)[- ](leak|usage|footprint|pressure|target|consumption)\\b", "weight": 6 },
+        { "pattern": "\\b(leak(s|ing)?|oom|rss|out of memory)\\b", "weight": 5 },
+        { "pattern": "\\b(mempool|bufferlist|buffer::ptr|bufferptr|refcount(ing)?|ref[- ]count(ing)?|ownership)\\b", "weight": 5 },
+        { "pattern": "\\b(cache (trim|eviction|size)|evict(ion)?|lru|priority ?cache|autotun\\w*)\\b", "weight": 4 },
+        { "pattern": "\\b(tcmalloc|jemalloc|malloc|heap fragmentation|use[- ]after[- ]free|double free)\\b", "weight": 5 },
+        { "pattern": "\\bosd_memory_target\\b", "weight": 6 }
+      ],
+      "labels": [ { "name": "memory", "weight": 8 } ]
+    },
+    {
+      "id": "architecture",
+      "name": "Major architectural changes",
+      "description": "New abstractions or subsystem boundaries, core interfaces/data structures, transaction semantics, concurrency model, cross-subsystem refactors.",
+      "requirePathEvidence": true,
+      "paths": [
+        { "pattern": "src/os/ObjectStore.*", "weight": 22, "note": "ObjectStore interface (transaction semantics)" },
+        { "pattern": "src/os/Transaction.*", "weight": 22, "note": "ObjectStore transaction encoding/semantics" },
+        { "pattern": "src/osd/PGBackend.h", "weight": 18, "note": "PG backend interface" },
+        { "pattern": "src/osd/osd_types.*", "weight": 18, "note": "core OSD data structures (encoded)" },
+        { "pattern": "src/osd/OSDMap.*", "weight": 18, "note": "OSDMap (cluster map, encoded)" },
+        { "pattern": "src/kv/KeyValueDB.h", "weight": 14, "note": "key-value storage-engine interface" },
+        { "pattern": "src/include/{denc,encoding,rados,ceph_features,types,object}.h", "weight": 18, "note": "core encoding / protocol definitions" },
+        { "pattern": "src/msg/{Message,Messenger,Connection,Dispatcher}.*", "weight": 16, "note": "messenger interfaces" },
+        { "pattern": "src/crimson/os/futurized_store.*", "weight": 16, "note": "Crimson store interface" },
+        { "pattern": "src/crimson/common/{interruptible_future,errorator}*", "weight": 14, "note": "Crimson concurrency/error model" },
+        { "pattern": "src/common/{ceph_context,config,options}.{cc,h}", "weight": 8, "note": "process-wide context/config" },
+        { "pattern": "src/mon/{OSDMonitor,Paxos,PaxosService,Monitor}.*", "weight": 10, "note": "monitor consensus / map management" }
+      ],
+      "keywords": [
+        { "pattern": "\\b(redesign|re-?architect\\w*|rework|overhaul|rewrite)\\b", "weight": 5 },
+        { "pattern": "\\b(new (interface|abstraction|backend|api)|introduce\\w* (a |an )?(new )?(interface|abstraction|layer))\\b", "weight": 5 },
+        { "pattern": "\\b(transaction semantics|consistency|atomicity|failure handling|crash consistency)\\b", "weight": 5 },
+        { "pattern": "\\b(rfc|design doc|proposal|refactor(ing)?)\\b", "weight": 3 }
+      ],
+      "labels": [ { "name": "core", "weight": 3 } ]
+    }
+  ]
+}

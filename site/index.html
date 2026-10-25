@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ceph PR Radar</title>
+  <meta name="description" content="Trending and technically important open pull requests in ceph/ceph.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6.5' fill='none' stroke='%23d14' stroke-width='2'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%23d14'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip" href="#view">Skip to results</a>
+  <header class="top">
+    <div class="brand">
+      <h1>Ceph PR Radar</h1>
+      <p id="data-status" class="data-status" aria-live="polite">Loading…</p>
+    </div>
+    <nav aria-label="Views">
+      <a href="#/trending" data-view="trending">Trending</a>
+      <a href="#/technical" data-view="technical">Technical importance</a>
+      <a href="#/subsystems" data-view="subsystems">Subsystems</a>
+      <a href="#/about" data-view="about">About / Scoring</a>
+    </nav>
+  </header>
+
+  <div id="banners" class="banners"></div>
+
+  <form id="filters" class="filters" aria-label="Filters" role="search">
+    <label class="f-q">Search <input type="search" name="q" placeholder="title, #number, author" autocomplete="off"></label>
+    <label>Subsystem <select name="sub"><option value="">All</option></select></label>
+    <label>Author <input type="text" name="author" list="authors" placeholder="any" autocomplete="off"></label>
+    <datalist id="authors"></datalist>
+    <label>Label <select name="label"><option value="">All</option></select></label>
+    <label>Status
+      <select name="status">
+        <option value="all">All</option>
+        <option value="ready">Ready for review</option>
+        <option value="draft">Draft</option>
+      </select>
+    </label>
+    <label title="Time window for displayed activity counts and activity-based sorting">Window <select name="win"><option value="7d">7d</option></select></label>
+    <label class="f-min" title="Minimum score for this view">Min score <input type="number" name="min" min="0" step="1" inputmode="numeric"></label>
+    <label class="f-sort">Sort <select name="sort"></select></label>
+    <label class="check"><input type="checkbox" name="active" value="1"> Active in window</label>
+    <label class="check"><input type="checkbox" name="backports" value="1" checked> Include backports</label>
+    <button type="reset">Reset</button>
+  </form>
+
+  <main>
+    <p id="result-count" class="result-count" aria-live="polite"></p>
+    <div id="view" tabindex="-1"></div>
+  </main>
+
+  <dialog id="detail" aria-labelledby="detail-title">
+    <div id="detail-content"></div>
+  </dialog>
+
+  <footer class="foot">
+    Static dashboard built from the public GitHub API. Scores are heuristics; see <a href="#/about">About / Scoring</a>.
+  </footer>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

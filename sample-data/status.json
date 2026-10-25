@@ -1,0 +1,12 @@
+{
+  "lastAttemptAt": "2026-10-25T14:51:01.549Z",
+  "ok": true,
+  "error": null,
+  "lastSuccessAt": "2026-10-25T14:51:01.549Z",
+  "lastSuccessId": "20261025T145101Z",
+  "partial": true,
+  "notes": [
+    "Sample dataset generated from test fixtures; not live data.",
+    "1 PR(s) have no detail data yet (only list metadata); their scores are incomplete."
+  ]
+}
