@@ -255,6 +255,23 @@
       "forcePushesHoursAgo": [300]
     },
     {
+      "_comment": "CephFS MDS locking/migration fix with little discussion.",
+      "number": 61017,
+      "title": "mds: fix deadlock between subtree export and rename during migration",
+      "author": "mdsdev",
+      "createdDaysAgo": 8,
+      "labels": ["cephfs"],
+      "body": "The Migrator could hold the dir lock while Locker waited on the same inode during a cross-MDS rename, leading to a deadlock. Tracker: https://tracker.ceph.com/issues/12345",
+      "files": [
+        ["src/mds/Migrator.cc", 48, 22],
+        ["src/mds/Locker.cc", 30, 9],
+        ["src/mds/MDCache.h", 4, 1],
+        ["qa/tasks/cephfs/test_exports.py", 60, 0]
+      ],
+      "comments": [ { "author": "mds-rev", "hoursAgo": 90 } ],
+      "commits": [ { "hoursAgo": 150, "count": 2 } ]
+    },
+    {
       "_comment": "Older PR whose activity suddenly accelerated.",
       "number": 61016,
       "title": "osd/scheduler: fix mClock cost calculation for recovery ops",

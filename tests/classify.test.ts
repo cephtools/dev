@@ -153,3 +153,17 @@ test('move/rename/cleanup titles are weighted down and flagged', () => {
   assert.ok(Math.abs(moved.raw - normal.raw * cfg.mechanicalMultiplier) < 0.2);
   assert.match(moved.explanation, /move\/rename\/cleanup/);
 });
+
+test('MDS and client changes classify as CephFS; a deadlock in the title is a reported risk', () => {
+  const r = technicalImportance(record({
+    title: 'mds: fix deadlock between subtree export and rename',
+    labels: ['cephfs'],
+    files: files(['src/mds/Migrator.cc', 48, 22], ['src/mds/Locker.cc', 30, 9], ['src/client/Client.cc', 10, 2]),
+  }), rules, cfg);
+  assert.equal(ids(r)[0], 'cephfs');
+  assert.equal(r.confidence, 'high');
+  assert.ok(r.important);
+  assert.ok(r.signals.some((s) => s.detail.startsWith('Mentions a regression')));
+  const types = technicalImportance(record({ title: 'mds: bump inode_t encoding', files: files(['src/mds/mdstypes.h', 20, 5]) }), rules, cfg);
+  assert.ok(types.signals.some((s) => s.type === 'format'), 'mdstypes is a persistent format');
+});

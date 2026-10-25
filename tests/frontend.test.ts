@@ -39,7 +39,8 @@ test('technical card shows subsystems, confidence, explanation and relevant file
   assert.match(html, /BlueStore/);
   assert.match(html, /High confidence/);
   assert.match(html, /bluestore_types/);
-  assert.match(html, /no discussion in 30d/);
+  assert.match(html, /no discussion yet/); // #61002 is 12 days old
+  assert.match(renderTechnicalCard({ ...pr(61002), createdAt: new Date(NOW.getTime() - 45 * 86400_000).toISOString() }, ctx), /no discussion in 30d/);
   assert.match(html, /\+\d+ more/);
 });
 
@@ -104,7 +105,7 @@ test('banners: failure, stale, sample and partial states', () => {
 test('list pagination, subsystems and about render', () => {
   const html = renderList(dataset.prs, 'trending', ctx, 3);
   assert.equal((html.match(/<article/g) ?? []).length, 3);
-  assert.match(html, /Show more \(13 remaining\)/);
+  assert.match(html, new RegExp(`Show more \\(${dataset.prs.length - 3} remaining\\)`));
   const subs = renderSubsystems(dataset.prs, ctx);
   for (const s of dataset.subsystems) assert.ok(subs.includes(s.name.replace('&', '&amp;')));
   assert.match(renderAbout(ctx), /Acceleration/);

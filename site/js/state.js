@@ -33,7 +33,7 @@ export const DEFAULT_FILTERS = {
   status: 'all', // all | ready | draft
   win: '7d',
   min: '', // empty: view default
-  backports: '1',
+  backports: '', // '1': also show PRs targeting release branches
   active: '', // '1': only PRs with activity in the selected window
   sort: '',
 };

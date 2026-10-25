@@ -12,7 +12,7 @@ The scores are independent. Technical importance is computed only from *what a P
 (paths, persistent formats, interfaces) and how it is described, never from comments or reviews.
 
 Views: **Trending**, **Technical importance**, **Subsystems** (BlueStore, RocksDB & metadata,
-Crimson & Seastar, OSD performance, Memory management, Major architectural changes) and
+Crimson & Seastar, OSD performance, Memory management, CephFS, Major architectural changes) and
 **About / Scoring**, which documents the live scoring parameters. Clicking a PR opens a detail panel
 with measured metrics, score breakdowns, classification evidence and links to the changed files on GitHub.
 

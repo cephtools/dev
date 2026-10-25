@@ -129,8 +129,11 @@ export function renderTechnicalCard(pr, ctx) {
   const d30 = pr.metrics['30d'] ?? windowMetrics(pr, '30d');
   const relevant = pr.files.filter((f) => f.relevant);
   const notes = [confidenceChip(t.confidence)];
-  if (d30 && d30.comments + d30.reviews === 0) notes.push('<span class="badge quiet" title="No human comments or reviews in 30 days">no discussion in 30d</span>');
-  else notes.push(`${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')} in 30d`);
+  // The 30-day window covers a younger PR's whole life, so say so instead of "in 30d".
+  const young = hoursSince(pr.createdAt, now) < 30 * 24;
+  const span = young ? `since it was opened ${relTime(pr.createdAt, now)}` : 'in 30 days';
+  if (d30 && d30.comments + d30.reviews === 0) notes.push(`<span class="badge quiet" title="No human comments or reviews ${esc(span)}">${young ? 'no discussion yet' : 'no discussion in 30d'}</span>`);
+  else notes.push(`<span title="Human comments and reviews ${esc(span)}">${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')}${young ? '' : ' in 30d'}</span>`);
   notes.push(...badgeList(pr, dataset), updatedBit(pr, now));
   if (relevant.length) {
     notes.push(`<code class="path" title="${esc(relevant[0].path)}">${esc(relevant[0].path)}</code>${relevant.length > 1 ? ` <small>+${relevant.length - 1} more</small>` : ''}`);

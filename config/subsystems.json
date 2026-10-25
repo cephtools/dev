@@ -19,7 +19,12 @@
     "src/crimson/os/seastore/seastore_types.*",
     "src/crimson/os/seastore/**/*_types.*",
     "src/messages/**",
-    "src/msg/async/frames_v2.*"
+    "src/msg/async/frames_v2.*",
+    "src/mds/mdstypes.*",
+    "src/mds/snap.*",
+    "src/mds/inode_backtrace.*",
+    "src/include/ceph_fs.h",
+    "src/include/cephfs/types.h"
   ],
   "coreAreas": {
     "$comment": "Top-level areas used to measure breadth of a change. A non-test file counts toward the first area whose prefix matches.",
@@ -191,6 +196,45 @@
         { "pattern": "\\bosd_memory_target\\b", "weight": 6 }
       ],
       "labels": [ { "name": "memory", "weight": 8 } ]
+    },
+    {
+      "id": "cephfs",
+      "name": "CephFS",
+      "description": "MDS metadata cache, locking and journaling, subtree migration and balancing, snapshots and quotas, the client/libcephfs I/O path, mirroring and MDS map handling.",
+      "paths": [
+        { "pattern": "src/mds/mdstypes.*", "weight": 24, "note": "MDS on-disk/wire metadata types (encoded)" },
+        { "pattern": "src/mds/{snap,SnapRealm,SnapServer,SnapClient,inode_backtrace}*", "weight": 20, "note": "snapshot realms and backtraces (encoded)" },
+        { "pattern": "src/mds/{MDCache,CInode,CDir,CDentry}.*", "weight": 22, "note": "MDS metadata cache" },
+        { "pattern": "src/mds/{Locker,SimpleLock,ScatterLock,LocalLock}.*", "weight": 20, "note": "MDS distributed locking / capabilities" },
+        { "pattern": "src/mds/{journal,MDLog,LogEvent,LogSegment,events/**,JournalPointer}*", "weight": 20, "note": "MDS journaling and replay" },
+        { "pattern": "src/mds/{Server,MDSRank,MDSDaemon,MDSContext}.*", "weight": 18, "note": "MDS request handling and rank lifecycle" },
+        { "pattern": "src/mds/{Migrator,MDBalancer,Mantle}.*", "weight": 18, "note": "subtree migration and balancing" },
+        { "pattern": "src/mds/{PurgeQueue,StrayManager,OpenFileTable,ScrubStack,DamageTable,MetricsHandler,MDSMetrics}*", "weight": 14, "note": "MDS maintenance (purge, strays, scrub, metrics)" },
+        { "pattern": "src/mds/{FSMap,MDSMap}.*", "weight": 16, "note": "file system / MDS maps (encoded)" },
+        { "pattern": "src/mds/**", "weight": 10, "note": "other MDS code" },
+        { "pattern": "src/client/{Client,Inode,Dentry,Fh,MetaRequest,MetaSession,UserPerm}.*", "weight": 18, "note": "libcephfs/ceph-fuse client I/O path and caps" },
+        { "pattern": "src/client/**", "weight": 10, "note": "other client code" },
+        { "pattern": "src/libcephfs*", "weight": 14, "note": "libcephfs API" },
+        { "pattern": "src/include/cephfs/**", "weight": 14, "note": "libcephfs public headers" },
+        { "pattern": "src/include/ceph_fs.h", "weight": 18, "note": "CephFS wire protocol definitions" },
+        { "pattern": "src/ceph_fuse.cc", "weight": 10, "note": "ceph-fuse" },
+        { "pattern": "src/mon/{MDSMonitor,FSCommands}.*", "weight": 12, "note": "monitor-side file system management" },
+        { "pattern": "src/messages/MClient*", "weight": 12, "note": "client <-> MDS messages" },
+        { "pattern": "src/messages/MMDS*", "weight": 12, "note": "MDS <-> MDS messages" },
+        { "pattern": "src/tools/cephfs_mirror/**", "weight": 10, "note": "cephfs-mirror" },
+        { "pattern": "src/tools/cephfs/**", "weight": 8, "note": "cephfs tools (journal/data scan)" },
+        { "pattern": "src/pybind/mgr/{volumes,mds_autoscaler,snap_schedule,nfs,mirroring}/**", "weight": 8, "note": "mgr modules for file systems (volumes, snap-schedule, NFS, mirroring)" },
+        { "pattern": "src/pybind/cephfs/**", "weight": 6, "note": "python bindings" }
+      ],
+      "keywords": [
+        { "pattern": "\\bcephfs\\b", "weight": 6 },
+        { "pattern": "\\b(mds|metadata server)\\b", "weight": 5 },
+        { "pattern": "\\b(mdcache|subtree|migrat(e|ion|or)|balancer|export(ing)? dir)\\b", "weight": 4 },
+        { "pattern": "\\b(caps?|capabilit(y|ies)|inode|dentry|dirfrag|stray|snaprealm|snapshot|quota)\\b", "weight": 3 },
+        { "pattern": "\\b(libcephfs|ceph-fuse|fuse|kclient|client caps)\\b", "weight": 4 },
+        { "pattern": "\\b(mdlog|journal(ing)? replay|purge ?queue|scrub)\\b", "weight": 3 }
+      ],
+      "labels": [ { "name": "cephfs", "weight": 8 } ]
     },
     {
       "id": "architecture",
