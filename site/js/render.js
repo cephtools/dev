@@ -1,10 +1,14 @@
 // HTML renderers. Pure functions returning strings (no DOM), so they can be tested in
 // Node. Every interpolated value goes through esc().
 
-import { absTime, esc, hoursSince, num, plural, relTime } from './format.js';
+import { absTime, esc, hoursSince, hueOf, num, plural, relTime } from './format.js';
 import { windowMetrics } from './state.js';
 
 const CONF_LABEL = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
+
+function authorHtml(login) {
+  return `<span class="author" style="--h:${hueOf(login)}">${esc(login)}</span>`;
+}
 
 export function subsystemName(dataset, id) {
   return dataset.subsystems.find((s) => s.id === id)?.name ?? id;
@@ -75,7 +79,7 @@ function rowTitle(pr, chips) {
 }
 
 function rowMeta(pr, now, notes) {
-  const opened = `<a class="pr-num" href="${esc(pr.url)}" target="_blank" rel="noopener" title="Open on GitHub">#${pr.number}</a> opened ${esc(relTime(pr.createdAt, now))}${pr.author ? ` by <span class="author">${esc(pr.author)}</span>` : ''}`;
+  const opened = `<a class="pr-num" href="${esc(pr.url)}" target="_blank" rel="noopener" title="Open on GitHub">#${pr.number}</a> opened ${esc(relTime(pr.createdAt, now))}${pr.author ? ` by ${authorHtml(pr.author)}` : ''}`;
   return `<p class="row-meta">${joinBits([opened, ...notes])}</p>`;
 }
 
@@ -124,10 +128,9 @@ export function renderTechnicalCard(pr, ctx) {
   const { dataset, now } = ctx;
   const t = pr.technical;
   const subs = t.subsystems
-    .map((s) => `<span class="chip sub conf-${esc(s.confidence)}" title="${esc(CONF_LABEL[s.confidence])}; subsystem score ${esc(s.score)}">${esc(subsystemName(dataset, s.id))}</span>`)
+    .map((s) => `<span class="chip sub conf-${esc(s.confidence)}" data-sub="${esc(s.id)}" title="${esc(CONF_LABEL[s.confidence])}; subsystem score ${esc(s.score)}">${esc(subsystemName(dataset, s.id))}</span>`)
     .join('');
   const d30 = pr.metrics['30d'] ?? windowMetrics(pr, '30d');
-  const relevant = pr.files.filter((f) => f.relevant);
   const notes = [confidenceChip(t.confidence)];
   // The 30-day window covers a younger PR's whole life, so say so instead of "in 30d".
   const young = hoursSince(pr.createdAt, now) < 30 * 24;
@@ -135,9 +138,6 @@ export function renderTechnicalCard(pr, ctx) {
   if (d30 && d30.comments + d30.reviews === 0) notes.push(`<span class="badge quiet" title="No human comments or reviews ${esc(span)}">${young ? 'no discussion yet' : 'no discussion in 30d'}</span>`);
   else notes.push(`<span title="Human comments and reviews ${esc(span)}">${plural(d30?.comments ?? 0, 'comment')}, ${plural(d30?.reviews ?? 0, 'review')}${young ? '' : ' in 30d'}</span>`);
   notes.push(...badgeList(pr, dataset), updatedBit(pr, now));
-  if (relevant.length) {
-    notes.push(`<code class="path" title="${esc(relevant[0].path)}">${esc(relevant[0].path)}</code>${relevant.length > 1 ? ` <small>+${relevant.length - 1} more</small>` : ''}`);
-  }
   const right = [
     metric('i-diff', t.coreLines, 'lines changed outside tests, docs and the dashboard frontend'),
     `<span class="score tech" title="Technical importance (heuristic, 0–100)">${esc(t.score)}</span>`,
@@ -256,7 +256,7 @@ export function renderDetail(pr, ctx) {
   const a = t.acceleration;
   const files = pr.files;
   const subsystems = tech.subsystems
-    .map((s) => `<div class="sub-detail"><h4>${esc(subsystemName(dataset, s.id))} <span class="muted">score ${esc(s.score)}</span> ${confidenceChip(s.confidence)}</h4>${evidenceList(s.evidence)}</div>`)
+    .map((s) => `<div class="sub-detail"><h4><span class="chip sub conf-${esc(s.confidence)}" data-sub="${esc(s.id)}">${esc(subsystemName(dataset, s.id))}</span> <span class="muted">score ${esc(s.score)}</span> ${confidenceChip(s.confidence)}</h4>${evidenceList(s.evidence)}</div>`)
     .join('');
   const flags = [
     tech.flags.backport && 'targets a release branch (backport, weighted down)',
@@ -271,7 +271,7 @@ export function renderDetail(pr, ctx) {
   <button type="button" class="close" data-close="1" aria-label="Close details">×</button>
 </header>
 <div class="detail-body">
-  <p class="meta">${pr.author ? `by <strong>${esc(pr.author)}</strong> · ` : ''}opened ${esc(relTime(pr.createdAt, now))} · base <code>${esc(pr.baseRef)}</code>${pr.ciState ? ` · CI ${esc(pr.ciState.toLowerCase())}` : ''} ${badges(pr, dataset)}</p>
+  <p class="meta">${pr.author ? `by ${authorHtml(pr.author)} · ` : ''}opened ${esc(relTime(pr.createdAt, now))} · base <code>${esc(pr.baseRef)}</code>${pr.ciState ? ` · CI ${esc(pr.ciState.toLowerCase())}` : ''} ${badges(pr, dataset)}</p>
   <p class="meta">${labelChips(pr, 20)}</p>
   <p class="links">${ghLink(pr.url, 'Conversation', 'btn')} ${ghLink(`${pr.url}/files`, 'Files changed', 'btn')} ${ghLink(`${pr.url}/commits`, 'Commits', 'btn')}</p>
 

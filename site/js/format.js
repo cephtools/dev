@@ -51,3 +51,11 @@ export async function diffAnchor(path) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(path));
   return 'diff-' + [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+/** Stable hue (0–359) for a string, so the same author always gets the same color. */
+export function hueOf(value) {
+  let h = 0;
+  for (const c of String(value ?? '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  // Spread with the golden angle so similar logins don't land on neighbouring hues.
+  return Math.round((h * 137.508) % 360);
+}

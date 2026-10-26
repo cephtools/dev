@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { diffAnchor, esc, relTime } from '../site/js/format.js';
+import { diffAnchor, esc, hueOf, relTime } from '../site/js/format.js';
 import { applyFilters, buildHash, parseHash, sortPrs } from '../site/js/state.js';
 import { renderAbout, renderBanners, renderDetail, renderList, renderSubsystems, renderTechnicalCard, renderTrendingCard } from '../site/js/render.js';
 import { sampleDataset } from '../src/sample/dataset.ts';
@@ -34,14 +34,15 @@ test('trending card shows score, explanation, metrics and GitHub link', () => {
   assert.match(html, /"badge hot"/);
 });
 
-test('technical card shows subsystems, confidence, explanation and relevant files', () => {
+test('technical card shows colored subsystems, confidence and explanation, but no file paths', () => {
   const html = renderTechnicalCard(pr(61002), ctx);
   assert.match(html, /BlueStore/);
   assert.match(html, /High confidence/);
-  assert.match(html, /bluestore_types/);
+  assert.match(html, /data-sub="bluestore"/);
+  assert.doesNotMatch(html, /bluestore_types|class="path"/);
+  assert.match(html, /class="author" style="--h:\d+"/);
   assert.match(html, /no discussion yet/); // #61002 is 12 days old
   assert.match(renderTechnicalCard({ ...pr(61002), createdAt: new Date(NOW.getTime() - 45 * 86400_000).toISOString() }, ctx), /no discussion in 30d/);
-  assert.match(html, /\+\d+ more/);
 });
 
 test('detail panel separates measured metrics from heuristic scores', () => {
@@ -121,4 +122,10 @@ test('file anchors computed in the browser match GitHub diff fragments', async (
   const { createHash } = await import('node:crypto');
   const path = 'src/os/bluestore/BlueStore.cc';
   assert.equal(await diffAnchor(path), `diff-${createHash('sha256').update(path).digest('hex')}`);
+});
+
+test('author hue is stable and in range', () => {
+  assert.equal(hueOf('storagedev'), hueOf('storagedev'));
+  assert.notEqual(hueOf('storagedev'), hueOf('storagedev2'));
+  for (const name of ['a', 'uidev', 'rev-a', 'ceph-jenkins']) assert.ok(hueOf(name) >= 0 && hueOf(name) < 360);
 });
