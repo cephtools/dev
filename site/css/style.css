@@ -189,10 +189,13 @@ main { padding-top: 10px; }
 .chip.sub.conf-high { border-style: solid; }
 .chip.sub.conf-medium { border-style: dashed; }
 .chip.sub.conf-low { border-style: dotted; font-weight: 500; }
-.author { --h: 0; color: hsl(var(--h) 55% 34%); font-weight: 600; }
+.author {
+  --h: 0; display: inline-block; padding: 0 6px; border-radius: 4px; font-weight: 600; line-height: 1.5;
+  background: hsl(var(--h) 85% 90%); color: hsl(var(--h) 70% 26%);
+}
 @media (prefers-color-scheme: dark) {
   .chip.sub { background: hsl(var(--h) 35% 19%); color: hsl(var(--h) 70% 78%); border-color: hsl(var(--h) 40% 42%); }
-  .author { color: hsl(var(--h) 65% 72%); }
+  .author { background: hsl(var(--h) 45% 22%); color: hsl(var(--h) 80% 82%); }
 }
 .conf { background: transparent; border-color: var(--border); color: var(--muted); }
 .conf-high.conf { border-color: var(--text); color: var(--text); }
