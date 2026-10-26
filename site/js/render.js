@@ -105,6 +105,7 @@ export function renderTrendingCard(pr, ctx) {
     metric('i-push', m.pushes, `${plural(m.pushes, 'code push', 'code pushes')} in ${win} (${plural(m.commits, 'commit')}); a rebase counts once`),
     `<span class="metric size" title="${plural(pr.changedFiles, 'file')} changed"><span class="add">+${num(pr.additions)}</span> <span class="del">−${num(pr.deletions)}</span></span>`,
     `<span class="score trend" title="Trending score (heuristic)">${esc(t.score)}${rankChange(pr)}</span>`,
+    ghLink(pr.url, 'GitHub'),
   ];
   return `<article class="row" data-pr="${pr.number}">
   ${stateIcon(pr)}
@@ -141,6 +142,7 @@ export function renderTechnicalCard(pr, ctx) {
   const right = [
     metric('i-diff', t.coreLines, 'lines changed outside tests, docs and the dashboard frontend'),
     `<span class="score tech" title="Technical importance (heuristic, 0–100)">${esc(t.score)}</span>`,
+    ghLink(pr.url, 'GitHub'),
   ];
   return `<article class="row" data-pr="${pr.number}">
   ${stateIcon(pr)}

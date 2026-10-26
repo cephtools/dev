@@ -154,6 +154,7 @@ main { padding-top: 10px; }
 .metric { display: inline-flex; align-items: center; gap: 4px; min-width: 2.8em; font-variant-numeric: tabular-nums; }
 .metric .ico { width: 14px; height: 14px; }
 .metric.size { min-width: 0; }
+.gh { font-size: 0.82rem; white-space: nowrap; }
 .score { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 4px; min-width: 3em; font-size: 0.95rem; font-weight: 700; color: var(--text); }
 .score.trend { color: var(--accent); }
 .delta { font-size: 0.7rem; font-weight: 600; }
