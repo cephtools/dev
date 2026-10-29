@@ -2,7 +2,7 @@
 // Node. Every interpolated value goes through esc().
 
 import { absTime, esc, hoursSince, hueOf, num, plural, relTime } from './format.js';
-import { windowMetrics } from './state.js';
+import { DEFAULT_FILTERS, prState, windowMetrics } from './state.js';
 
 const CONF_LABEL = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
 
@@ -24,14 +24,22 @@ function labelChips(pr, max = 4) {
   return shown + more;
 }
 
-function badgeList(pr, dataset, includeDraft = false) {
+/** "Merged", "Closed" or "Draft"; open PRs that are ready for review get none. */
+function stateBadge(pr) {
+  const state = prState(pr);
+  if (state === 'merged') return '<span class="badge merged">Merged</span>';
+  if (state === 'closed') return '<span class="badge closed">Closed</span>';
+  return pr.isDraft ? '<span class="badge draft">Draft</span>' : '';
+}
+
+function badgeList(pr, dataset, includeState = false) {
   const out = [];
-  if (includeDraft && pr.isDraft) out.push('<span class="badge draft">Draft</span>');
+  if (includeState && stateBadge(pr)) out.push(stateBadge(pr));
   const main = dataset.scoring.importance.mainBranches ?? ['main'];
   if (!main.includes(pr.baseRef)) out.push(`<span class="badge backport" title="Targets ${esc(pr.baseRef)}">→ ${esc(pr.baseRef)}</span>`);
   if (pr.detail === 'missing') out.push('<span class="badge warn" title="Activity and files not collected yet">no detail yet</span>');
   if (pr.detail === 'stale') out.push(`<span class="badge warn" title="Details fetched ${esc(absTime(pr.fetchedAt))}; PR changed since">details stale</span>`);
-  if (pr.ciState === 'FAILURE' || pr.ciState === 'ERROR') out.push('<span class="badge ci-fail">CI failing</span>');
+  if (prState(pr) === 'open' && (pr.ciState === 'FAILURE' || pr.ciState === 'ERROR')) out.push('<span class="badge ci-fail">CI failing</span>');
   return out;
 }
 
@@ -65,9 +73,27 @@ function ico(id) {
   return `<svg class="ico" aria-hidden="true" viewBox="0 0 16 16"><use href="#${id}"/></svg>`;
 }
 
+const STATE_ICONS = {
+  open: ['i-pr', 'Open pull request'],
+  draft: ['i-pr', 'Draft pull request'],
+  merged: ['i-merged', 'Merged pull request'],
+  closed: ['i-pr-closed', 'Closed pull request'],
+};
+
 function stateIcon(pr) {
-  const label = pr.isDraft ? 'Draft pull request' : 'Open pull request';
-  return `<span class="state ${pr.isDraft ? 'draft' : 'open'}" title="${label}">${ico('i-pr')}<span class="sr-only">${label}</span></span>`;
+  const state = prState(pr) === 'open' && pr.isDraft ? 'draft' : prState(pr);
+  const [icon, label] = STATE_ICONS[state];
+  return `<span class="state ${state}" title="${label}">${ico(icon)}<span class="sr-only">${label}</span></span>`;
+}
+
+/** When a merged or closed PR was merged or closed; null for open PRs. */
+function closedAt(pr) {
+  const state = prState(pr);
+  return state === 'open' ? null : (state === 'merged' && pr.mergedAt) || pr.closedAt;
+}
+
+function closedTime(pr, now) {
+  return `<time datetime="${esc(closedAt(pr) ?? '')}" title="${esc(absTime(closedAt(pr)))}">${esc(relTime(closedAt(pr), now))}</time>`;
 }
 
 function metric(id, value, label) {
@@ -79,8 +105,11 @@ function rowTitle(pr, chips) {
 }
 
 function rowMeta(pr, now, notes) {
-  const opened = `<a class="pr-num" href="${esc(pr.url)}" target="_blank" rel="noopener" title="Open on GitHub">#${pr.number}</a> opened ${esc(relTime(pr.createdAt, now))}${pr.author ? ` by ${authorHtml(pr.author)}` : ''}`;
-  return `<p class="row-meta">${joinBits([opened, ...notes])}</p>`;
+  const num = `<a class="pr-num" href="${esc(pr.url)}" target="_blank" rel="noopener" title="Open on GitHub">#${pr.number}</a>`;
+  const by = pr.author ? ` by ${authorHtml(pr.author)}` : '';
+  // As on GitHub: "#1 opened 3d ago by x", "#1 by x was merged 2d ago".
+  const head = closedAt(pr) ? `${num}${by} was ${esc(prState(pr))} ${closedTime(pr, now)}` : `${num} opened ${esc(relTime(pr.createdAt, now))}${by}`;
+  return `<p class="row-meta">${joinBits([head, ...notes])}</p>`;
 }
 
 function updatedBit(pr, now) {
@@ -162,7 +191,7 @@ export function renderList(prs, view, ctx, limit) {
 
 export function renderEmpty(view, filtered) {
   const msg = {
-    trending: 'No open PRs with recent substantive activity match these filters.',
+    trending: 'No PRs with recent substantive activity match these filters.',
     technical: 'No technically important PRs match these filters. Try lowering the minimum score.',
     subsystems: 'No classified PRs match these filters.',
   }[view] ?? 'Nothing to show.';
@@ -172,6 +201,7 @@ export function renderEmpty(view, filtered) {
 export function renderSubsystems(prs, ctx) {
   const { dataset } = ctx;
   const minScore = dataset.scoring.importance.minScore;
+  const status = ctx.status && ctx.status !== DEFAULT_FILTERS.status ? `&status=${encodeURIComponent(ctx.status)}` : '';
   return `<div class="subsys-grid">${dataset.subsystems
     .map((s) => {
       const members = prs.filter((p) => p.technical.subsystems.some((m) => m.id === s.id));
@@ -179,14 +209,14 @@ export function renderSubsystems(prs, ctx) {
       const high = members.filter((p) => p.technical.subsystems.find((m) => m.id === s.id)?.confidence === 'high');
       const top = [...members].sort((a, b) => b.technical.score - a.technical.score).slice(0, 6);
       const rows = top
-        .map((p) => `<li><span class="mini-score" title="Technical importance">${esc(p.technical.score)}</span><span><button type="button" class="pr-open" data-pr="${p.number}" aria-haspopup="dialog"><span class="num">#${p.number}</span> ${esc(p.title)}</button>${p.isDraft ? ' <span class="badge draft">Draft</span>' : ''}</span></li>`)
+        .map((p) => `<li><span class="mini-score" title="Technical importance">${esc(p.technical.score)}</span><span><button type="button" class="pr-open" data-pr="${p.number}" aria-haspopup="dialog"><span class="num">#${p.number}</span> ${esc(p.title)}</button>${stateBadge(p) ? ` ${stateBadge(p)}` : ''}</span></li>`)
         .join('');
       return `<section class="subsys" aria-labelledby="sub-${esc(s.id)}">
   <h3 id="sub-${esc(s.id)}">${esc(s.name)}</h3>
   <p class="muted">${esc(s.description)}</p>
   <p class="counts"><strong>${members.length}</strong> classified · <strong>${important.length}</strong> ≥ ${minScore} · <strong>${high.length}</strong> high confidence</p>
-  ${rows ? `<ol class="toplist">${rows}</ol>` : '<p class="muted">No open PRs classified here.</p>'}
-  ${members.length ? `<a class="view-all" href="#/technical?sub=${encodeURIComponent(s.id)}&min=0">All ${members.length} in Technical view →</a>` : ''}
+  ${rows ? `<ol class="toplist">${rows}</ol>` : '<p class="muted">No PRs classified here.</p>'}
+  ${members.length ? `<a class="view-all" href="#/technical?sub=${encodeURIComponent(s.id)}&min=0${status}">All ${members.length} in Technical view →</a>` : ''}
 </section>`;
     })
     .join('')}</div>`;
@@ -215,7 +245,10 @@ export function renderBanners(dataset, status, now = new Date()) {
 
 export function renderStatusLine(dataset, now = new Date()) {
   if (!dataset) return 'No dataset published yet';
-  return `Updated <time datetime="${esc(dataset.generatedAt)}" title="${esc(absTime(dataset.generatedAt))}">${esc(relTime(dataset.generatedAt, now))}</time> · ${esc(absTime(dataset.generatedAt))} · ${num(dataset.prs.length)} open PRs`;
+  const open = dataset.prs.filter((p) => prState(p) === 'open').length;
+  const days = dataset.collection.closedDays;
+  const closed = days ? ` · ${num(dataset.prs.length - open)} merged or closed in ${esc(days)}d` : '';
+  return `Updated <time datetime="${esc(dataset.generatedAt)}" title="${esc(absTime(dataset.generatedAt))}">${esc(relTime(dataset.generatedAt, now))}</time> · ${esc(absTime(dataset.generatedAt))} · ${num(open)} open PRs${closed}`;
 }
 
 // ---------- detail panel ----------
@@ -273,7 +306,7 @@ export function renderDetail(pr, ctx) {
   <button type="button" class="close" data-close="1" aria-label="Close details">×</button>
 </header>
 <div class="detail-body">
-  <p class="meta">${pr.author ? `by ${authorHtml(pr.author)} · ` : ''}opened ${esc(relTime(pr.createdAt, now))} · base <code>${esc(pr.baseRef)}</code>${pr.ciState ? ` · CI ${esc(pr.ciState.toLowerCase())}` : ''} ${badges(pr, dataset)}</p>
+  <p class="meta">${pr.author ? `by ${authorHtml(pr.author)} · ` : ''}opened ${esc(relTime(pr.createdAt, now))}${closedAt(pr) ? ` · ${esc(prState(pr))} ${closedTime(pr, now)}` : ''} · base <code>${esc(pr.baseRef)}</code>${pr.ciState ? ` · CI ${esc(pr.ciState.toLowerCase())}` : ''} ${badges(pr, dataset)}</p>
   <p class="meta">${labelChips(pr, 20)}</p>
   <p class="links">${ghLink(pr.url, 'Conversation', 'btn')} ${ghLink(`${pr.url}/files`, 'Files changed', 'btn')} ${ghLink(`${pr.url}/commits`, 'Commits', 'btn')}</p>
 
@@ -337,7 +370,8 @@ export function renderAbout(ctx) {
 </tbody></table>
 <p>Each event is counted once: inline comments are counted through the review that carries them and never as separate comments; events are de-duplicated by GitHub node id across pages and collection runs. Code size only nudges the code component (at most +${esc(Math.round(tr.sizeFactor.max * 100))}%), so a large but idle PR cannot trend.</p>
 <p><strong>Acceleration.</strong> Activity in the last ${esc(tr.recentDays)} days is compared with the PR's own weekly average over the previous ${esc(tr.baselineDays)} days, using event timestamps. The multiplier is 1 + ${esc(tr.acceleration.slope)}·log₂(ratio), clamped to [${esc(tr.acceleration.min)}, ${esc(tr.acceleration.max)}]. PRs younger than ${esc(tr.recentDays + tr.acceleration.minBaselineDays)} days, or whose older events were truncated by API limits, get no multiplier; the detail panel says which case applies.</p>
-<p><strong>Unusual activity</strong> flags PRs whose recent weighted activity is at least median + ${esc(tr.unusual.madMultiplier)}×MAD of PRs that had any recent activity (and ≥ ${esc(tr.unusual.minWeightedEvents)}). Current threshold: ${esc(pop.threshold)} (median ${esc(pop.median)}, ${esc(pop.population)} active PRs). This is a robust outlier heuristic, not a significance test.</p>
+<p><strong>Unusual activity</strong> flags PRs whose recent weighted activity is at least median + ${esc(tr.unusual.madMultiplier)}×MAD of open PRs that had any recent activity (and ≥ ${esc(tr.unusual.minWeightedEvents)}). Current threshold: ${esc(pop.threshold)} (median ${esc(pop.median)}, ${esc(pop.population)} active PRs). This is a robust outlier heuristic, not a significance test.</p>
+<p><strong>Merged and closed PRs</strong> (Status filter) are scored the same way, so activity just before a merge still shows. They are not ranked, though: trend ranks, rank movement and the unusual-activity threshold only consider open PRs.</p>
 
 <h2>Technical importance</h2>
 <p>Classification uses rules in <code>config/subsystems.json</code>:</p>
@@ -352,7 +386,7 @@ export function renderAbout(ctx) {
 <h2>Data</h2>
 <ul>
   <li>Source: ${c.source === 'sample' ? 'sample fixtures' : `GitHub GraphQL API, <a href="${esc(dataset.repo.url)}">${esc(dataset.repo.owner)}/${esc(dataset.repo.name)}</a>`}.</li>
-  <li>Collected ${esc(absTime(c.startedAt))}; ${esc(c.listed)} open PRs listed (GitHub reports ${esc(c.totalOpen)}); ${esc(c.fetched)} detail fetches this run, ${esc(c.stale)} stale, ${esc(c.missing)} without details; ${esc(c.apiRequests)} API requests (${esc(c.apiCost)} points).</li>
+  <li>Collected ${esc(absTime(c.startedAt))}; ${esc(c.listed)} open PRs listed (GitHub reports ${esc(c.totalOpen)})${c.closedDays ? `, plus ${esc(c.closedListed)} merged or closed in the last ${esc(c.closedDays)} days` : ''}; ${esc(c.fetched)} detail fetches this run, ${esc(c.stale)} stale, ${esc(c.missing)} without details; ${esc(c.apiRequests)} API requests (${esc(c.apiCost)} points).</li>
   <li>Windows: ${dataset.windows.map((w) => esc(w.key)).join(', ')}. Trend ranks compared with the snapshot from ${esc(absTime(dataset.history.comparedTo))}.</li>
   <li>Updates are scheduled every ~${esc(dataset.site.refreshHours)}h. If a run fails, the previous dataset stays online and a banner reports the failure.</li>
 </ul>

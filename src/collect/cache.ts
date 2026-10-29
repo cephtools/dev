@@ -62,7 +62,7 @@ export function mergeRecord(cached: PrRecord | undefined, fresh: PrRecord, now: 
 }
 
 /**
- * Apply list-level metadata (title, labels, draft, updatedAt) to a cached detail record
+ * Apply list-level metadata (title, state, labels, draft, updatedAt) to a cached detail record
  * so cheap fields stay current even when details are not refetched this run.
  */
 export function refreshListFields(cached: PrRecord, listed: PrRecord): PrRecord {
@@ -71,6 +71,9 @@ export function refreshListFields(cached: PrRecord, listed: PrRecord): PrRecord 
     title: listed.title,
     url: listed.url,
     listUpdatedAt: listed.updatedAt,
+    state: listed.state,
+    closedAt: listed.closedAt,
+    mergedAt: listed.mergedAt,
     isDraft: listed.isDraft,
     labels: listed.labels,
     baseRef: listed.baseRef,

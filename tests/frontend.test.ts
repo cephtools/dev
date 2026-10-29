@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { diffAnchor, esc, hueOf, relTime } from '../site/js/format.js';
-import { applyFilters, buildHash, parseHash, sortPrs } from '../site/js/state.js';
-import { renderAbout, renderBanners, renderDetail, renderList, renderSubsystems, renderTechnicalCard, renderTrendingCard } from '../site/js/render.js';
+import { applyFilters, buildHash, matchesStatus, parseHash, sortPrs } from '../site/js/state.js';
+import { renderAbout, renderBanners, renderDetail, renderList, renderStatusLine, renderSubsystems, renderTechnicalCard, renderTrendingCard } from '../site/js/render.js';
 import { sampleDataset } from '../src/sample/dataset.ts';
 import { NOW } from './helpers.ts';
 
@@ -70,6 +70,31 @@ test('filters: views, subsystem, draft status, backports, author, search', () =>
   assert.ok(!applyFilters(dataset.prs, 'technical', { ...filters, backports: '', min: '0' }, dataset).some((p) => p.baseRef !== 'main'));
   assert.deepEqual(applyFilters(dataset.prs, 'subsystems', { ...filters, author: 'StorageDev' }, dataset).map((p) => p.number), [61002]);
   assert.deepEqual(applyFilters(dataset.prs, 'subsystems', { ...filters, q: 'mclock' }, dataset).map((p) => p.number), [61016]);
+});
+
+test('status filter: open PRs by default, merged and closed ones on request', () => {
+  const nums = (status: string) => applyFilters(dataset.prs, 'subsystems', { ...filters, status, backports: '1' }, dataset).map((p) => p.number);
+  const open = nums('open');
+  assert.equal(open.length, dataset.collection.listed);
+  assert.ok(!open.includes(60990) && !open.includes(60975));
+  assert.deepEqual(nums('merged'), [60990]);
+  assert.deepEqual(nums('closed'), [60975]);
+  assert.deepEqual(nums('done'), [60990, 60975]);
+  assert.equal(nums('all').length, dataset.prs.length);
+  assert.ok(!nums('ready').includes(60990), 'ready for review means open');
+  assert.ok(matchesStatus({ isDraft: false }, 'open'), 'PRs without a state (older datasets) are open');
+});
+
+test('merged and closed PRs are shown as such', () => {
+  const merged = renderTrendingCard(pr(60990), ctx);
+  assert.match(merged, /class="state merged"/);
+  assert.match(merged, /#60990<\/a> by <span class="author"[^>]*>storagedev<\/span> was merged <time[^>]*>2d ago<\/time>/);
+  assert.doesNotMatch(merged, /class="delta/, 'not ranked');
+  assert.match(renderTechnicalCard(pr(60975), ctx), /class="state closed"[\s\S]*was closed/);
+  assert.match(renderDetail(pr(60990), ctx), /badge merged/);
+  assert.match(renderStatusLine(dataset, NOW), / open PRs · 2 merged or closed in 30d$/);
+  assert.match(renderSubsystems(dataset.prs, { ...ctx, status: 'merged' }), /&min=0&status=merged"/);
+  assert.doesNotMatch(renderSubsystems(dataset.prs, { ...ctx, status: 'open' }), /status=/);
 });
 
 test('sorting: each view sorts independently', () => {

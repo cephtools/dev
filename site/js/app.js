@@ -1,7 +1,7 @@
 // DOM glue: load data, keep controls ⇄ URL hash in sync, render the current view.
 
 import { diffAnchor, esc } from './format.js';
-import { applyFilters, buildHash, DEFAULT_FILTERS, defaultSort, effectiveMin, facets, parseHash, SORTS, sortPrs } from './state.js';
+import { applyFilters, buildHash, DEFAULT_FILTERS, defaultSort, effectiveMin, facets, matchesStatus, parseHash, SORTS, sortPrs } from './state.js';
 import { renderAbout, renderBanners, renderDetail, renderEmpty, renderList, renderStatusLine, renderSubsystems } from './render.js';
 
 const PAGE = 50;
@@ -21,6 +21,7 @@ let status = null;
 let state = parseHash(location.hash);
 let limit = PAGE;
 let lastTrigger = null;
+let facetStatus = null;
 
 /** Dataset files are immutable (unique id), so they use normal caching; manifest/status are revalidated. */
 async function loadJson(url, revalidate = false) {
@@ -52,7 +53,7 @@ async function upgradeFileLinks(root, prUrl) {
 }
 
 function ctx() {
-  return { dataset, win: state.filters.win, now: new Date() };
+  return { dataset, win: state.filters.win, status: state.filters.status, now: new Date() };
 }
 
 function control(name) {
@@ -65,12 +66,23 @@ function fillSelect(name, options, keepFirst = true) {
   sel.innerHTML = first + options.map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join('');
 }
 
+/** Label and author choices come from the PRs the Status filter selects, so merged and closed PRs only count when asked for. */
+function populateFacets() {
+  if (facetStatus === state.filters.status) return;
+  facetStatus = state.filters.status;
+  const f = facets(dataset.prs.filter((p) => matchesStatus(p, facetStatus)));
+  fillSelect('label', f.labels.map(([l, n]) => [l, `${l} (${n})`]));
+  control('label').value = state.filters.label;
+  $('#authors').innerHTML = f.authors.map(([a]) => `<option value="${esc(a)}"></option>`).join('');
+}
+
 function populateControls() {
   fillSelect('sub', dataset.subsystems.map((s) => [s.id, s.name]));
-  const f = facets(dataset.prs);
-  fillSelect('label', f.labels.map(([l, n]) => [l, `${l} (${n})`]));
-  $('#authors').innerHTML = f.authors.map(([a]) => `<option value="${esc(a)}"></option>`).join('');
   fillSelect('win', dataset.windows.map((w) => [w.key, w.key]), false);
+  const days = dataset.collection.closedDays;
+  const closedGroup = control('status').querySelector('optgroup[data-closed]');
+  if (days) closedGroup.label = `Merged or closed in ${days}d`;
+  else closedGroup.disabled = true; // turned off, or the dataset predates it
 }
 
 function syncControls() {
@@ -115,6 +127,7 @@ function isFiltered() {
 
 function render() {
   if (!dataset) return;
+  populateFacets();
   els.status.innerHTML = renderStatusLine(dataset);
   renderBannerList();
   const { view, filters } = state;

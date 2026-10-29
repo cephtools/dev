@@ -8,7 +8,26 @@ query ListOpenPrs($owner: String!, $name: String!, $first: Int!, $after: String)
       totalCount
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title url isDraft createdAt updatedAt baseRefName
+        number title url state isDraft createdAt updatedAt closedAt mergedAt baseRefName
+        additions deletions changedFiles
+        author { login __typename }
+        labels(first: 30) { nodes { name } }
+      }
+    }
+  }
+}`;
+
+// Closed and merged PRs, most recently updated first. Closing a PR updates it, so
+// closedAt <= updatedAt and the collector can stop paginating at the first PR updated
+// before its cutoff instead of walking the repository's whole closed history.
+export const LIST_CLOSED_PRS = /* GraphQL */ `
+query ListClosedPrs($owner: String!, $name: String!, $first: Int!, $after: String) {
+  rateLimit { cost remaining resetAt }
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: [CLOSED, MERGED], first: $first, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        number title url state isDraft createdAt updatedAt closedAt mergedAt baseRefName
         additions deletions changedFiles
         author { login __typename }
         labels(first: 30) { nodes { name } }
@@ -21,7 +40,7 @@ query ListOpenPrs($owner: String!, $name: String!, $first: Int!, $after: String)
 // needs. Anything older is merged from the cache or recorded as truncated history.
 export const PR_DETAIL_FRAGMENT = /* GraphQL */ `
 fragment PrDetail on PullRequest {
-  number title url isDraft createdAt updatedAt baseRefName body
+  number title url state isDraft createdAt updatedAt closedAt mergedAt baseRefName body
   additions deletions changedFiles
   author { login __typename }
   labels(first: 30) { nodes { name } }

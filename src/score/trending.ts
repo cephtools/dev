@@ -167,12 +167,12 @@ export function trendingScore(rec: PrRecord, ctx: TrendingContext): TrendingResu
 
 /**
  * Population comparison: mark PRs whose recent weighted activity is far above that of
- * comparable open PRs (those with any recent activity), using median + k × MAD.
+ * comparable PRs in `population` (those with any recent activity), using median + k × MAD.
  * Returns the threshold so the UI can show it. This is a robust heuristic, not a
  * statistical significance test.
  */
-export function markUnusual(results: TrendingResult[], config: TrendingConfig): { median: number; mad: number; threshold: number; population: number } {
-  const active = results.map((r) => r.acceleration.recentWeighted).filter((v) => v > 0).sort((a, b) => a - b);
+export function markUnusual(results: TrendingResult[], config: TrendingConfig, population: TrendingResult[] = results): { median: number; mad: number; threshold: number; population: number } {
+  const active = population.map((r) => r.acceleration.recentWeighted).filter((v) => v > 0).sort((a, b) => a - b);
   const median = quantile(active, 0.5);
   const mad = quantile(active.map((v) => Math.abs(v - median)).sort((a, b) => a - b), 0.5);
   // 1.4826 × MAD estimates a standard deviation for roughly normal data.

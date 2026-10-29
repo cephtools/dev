@@ -78,6 +78,20 @@ test('list-only PR is kept and marked missing, not dropped', () => {
   assert.ok(dataset.collection.partial);
 });
 
+test('recently merged PR keeps its scores but takes no trending rank', () => {
+  const p = pr(60990);
+  assert.equal(p.state, 'merged');
+  assert.ok(p.mergedAt);
+  assert.ok(p.technical.important);
+  assert.ok(p.trending.score > 0);
+  assert.equal(p.trending.rank, null);
+  assert.equal(pr(60975).state, 'closed');
+  assert.equal(pr(60975).mergedAt, null);
+  const ranks = dataset.prs.flatMap((x) => (x.trending.rank === null ? [] : [x.trending.rank])).sort((a, b) => a - b);
+  assert.deepEqual(ranks, ranks.map((_, i) => i + 1), 'open PRs are ranked 1..n without gaps');
+  assert.equal(dataset.scoring.population.population, dataset.prs.filter((x) => x.state === 'open' && x.trending.acceleration.recentWeighted > 0).length);
+});
+
 test('dataset covers every fixture PR', () => {
   assert.equal(dataset.prs.length, sampleRecords(NOW).length);
 });

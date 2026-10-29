@@ -75,6 +75,8 @@ export interface CollectionConfig {
   maxDetailPrsPerRun: number;
   /** Cap for the first run (empty cache), so the first deploy happens within minutes. */
   bootstrapMaxDetailPrs: number;
+  /** Also collect PRs merged or closed within this many days; 0 collects open PRs only. */
+  closedDays: number;
   rateLimitReserve: number;
   maxRateLimitWaitSeconds: number;
   maxRetries: number;

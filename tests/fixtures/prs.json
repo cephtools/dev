@@ -1,5 +1,5 @@
 {
-  "description": "Representative open PRs, expressed relative to 'now'. Expanded into raw GraphQL nodes by src/sample/expand.ts. PR numbers, authors and content are synthetic.",
+  "description": "Representative open, recently merged and recently closed PRs, expressed relative to 'now'. Expanded into raw GraphQL nodes by src/sample/expand.ts. PR numbers, authors and content are synthetic.",
   "prs": [
     {
       "_comment": "Highly discussed, limited architectural impact (dashboard frontend).",
@@ -295,6 +295,52 @@
       ],
       "commits": [ { "hoursAgo": 1000, "count": 2 }, { "hoursAgo": 16, "count": 1 } ],
       "forcePushesHoursAgo": [16]
+    },
+    {
+      "_comment": "Merged two days ago after a review round: technically important, recent activity, but no trending rank.",
+      "number": 60990,
+      "title": "os/bluestore: bound onode cache trimming latency under memory pressure",
+      "author": "storagedev",
+      "createdDaysAgo": 20,
+      "state": "merged",
+      "closedHoursAgo": 50,
+      "labels": ["bluestore", "performance"],
+      "body": "Onode cache trimming could stall the kv_sync thread for hundreds of milliseconds when the PriorityCache shrank the cache. Trimming is now incremental. p99 write latency under memory pressure drops from 210ms to 35ms.",
+      "files": [
+        ["src/os/bluestore/BlueStore.cc", 160, 70],
+        ["src/os/bluestore/BlueStore.h", 24, 6],
+        ["src/common/PriorityCache.cc", 18, 4],
+        ["src/test/objectstore/store_test.cc", 80, 0]
+      ],
+      "comments": [
+        { "author": "bs-rev", "hoursAgo": 140 },
+        { "author": "storagedev", "hoursAgo": 120 },
+        { "author": "perf-qa", "hoursAgo": 60, "body": "Teuthology run is green." }
+      ],
+      "reviews": [
+        { "author": "bs-rev", "hoursAgo": 150, "state": "CHANGES_REQUESTED", "inline": 5, "body": "Trim budget needs a config option." },
+        { "author": "bs-rev", "hoursAgo": 55, "state": "APPROVED" },
+        { "author": "osd-lead", "hoursAgo": 52, "state": "APPROVED" }
+      ],
+      "commits": [ { "hoursAgo": 400, "count": 3 }, { "hoursAgo": 100, "count": 1 } ],
+      "forcePushesHoursAgo": [100]
+    },
+    {
+      "_comment": "Closed without merging (superseded); quiet.",
+      "number": 60975,
+      "title": "osd: rework PG log trimming to avoid long pauses",
+      "author": "osddev",
+      "createdDaysAgo": 60,
+      "state": "closed",
+      "closedHoursAgo": 140,
+      "labels": ["core"],
+      "body": "Superseded by a smaller change.",
+      "files": [
+        ["src/osd/PGLog.cc", 120, 80],
+        ["src/osd/PGLog.h", 20, 5]
+      ],
+      "comments": [ { "author": "osd-lead", "hoursAgo": 140, "body": "Closing in favour of the incremental approach." } ],
+      "commits": [ { "hoursAgo": 1200, "count": 2 } ]
     }
   ]
 }

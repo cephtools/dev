@@ -5,7 +5,7 @@ import type { CollectStats } from '../collect/collector.ts';
 import { allWindowMetrics, lastActivityAt } from '../score/metrics.ts';
 import { technicalImportance } from '../score/importance.ts';
 import { markUnusual, trendingScore } from '../score/trending.ts';
-import type { ChangedFile, PrRecord, TechnicalResult, TrendingResult, WindowDef, WindowMetrics } from '../types.ts';
+import type { ChangedFile, PrRecord, PrState, TechnicalResult, TrendingResult, WindowDef, WindowMetrics } from '../types.ts';
 import { HOUR_MS, ms } from '../util/time.ts';
 import { comparisonSnapshot, type History, type Snapshot } from './history.ts';
 import { churn } from '../score/classify.ts';
@@ -23,11 +23,14 @@ export interface DatasetPr {
   title: string;
   url: string;
   author: string | null;
+  state: PrState;
   isDraft: boolean;
   baseRef: string;
   labels: string[];
   createdAt: string;
   updatedAt: string;
+  closedAt: string | null;
+  mergedAt: string | null;
   lastActivityAt: string | null;
   additions: number;
   deletions: number;
@@ -84,7 +87,8 @@ export function datasetId(now: Date): string {
 function detailState(rec: PrRecord, config: DashboardConfig, now: Date): DatasetPr['detail'] {
   if (rec.detail !== 'full') return 'missing';
   const changed = rec.listUpdatedAt !== undefined && rec.listUpdatedAt !== rec.updatedAt;
-  const old = now.getTime() - ms(rec.fetchedAt) > config.collection.refreshAfterHours * HOUR_MS;
+  // Merged and closed PRs are not refreshed by age (see selectForRefresh), so age alone doesn't make them stale.
+  const old = rec.state === 'open' && now.getTime() - ms(rec.fetchedAt) > config.collection.refreshAfterHours * HOUR_MS;
   return changed || old ? 'stale' : 'fresh';
 }
 
@@ -101,11 +105,14 @@ export function buildDataset(input: BuildInput): { dataset: Dataset; snapshot: S
   const { records, stats, config, rules, now, history } = input;
 
   const trending = records.map((rec) => trendingScore(rec, { now, config: config.trending, collection: config.collection }));
-  const population = markUnusual(trending, config.trending);
+  // Ranks and the "unusual" baseline are about open PRs: merged and closed PRs get a
+  // score (and an unusual flag) but neither take a rank nor shift the threshold.
+  const isOpen = records.map((rec) => rec.state === 'open');
+  const population = markUnusual(trending, config.trending, trending.filter((_, i) => isOpen[i]));
 
   const ranked = records
     .map((rec, i) => ({ n: rec.number, s: trending[i].score }))
-    .filter((r) => r.s > 0)
+    .filter((r, i) => r.s > 0 && isOpen[i])
     .sort((a, b) => b.s - a.s || b.n - a.n);
   const rankOf = new Map(ranked.map((r, i) => [r.n, i + 1]));
   const previous = comparisonSnapshot(history, now);
@@ -118,11 +125,14 @@ export function buildDataset(input: BuildInput): { dataset: Dataset; snapshot: S
       title: rec.title,
       url: rec.url,
       author: rec.author,
+      state: rec.state,
       isDraft: rec.isDraft,
       baseRef: rec.baseRef,
       labels: rec.labels,
       createdAt: rec.createdAt,
       updatedAt: rec.listUpdatedAt ?? rec.updatedAt,
+      closedAt: rec.closedAt,
+      mergedAt: rec.mergedAt,
       lastActivityAt: lastActivityAt(rec, config.collection),
       additions: rec.additions,
       deletions: rec.deletions,

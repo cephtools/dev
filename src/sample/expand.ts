@@ -15,6 +15,9 @@ export interface FixtureSpec {
   author: string;
   authorBot?: boolean;
   createdDaysAgo: number;
+  /** Merged or closed PRs; `closedHoursAgo` is when that happened. Default: open. */
+  state?: 'merged' | 'closed';
+  closedHoursAgo?: number;
   draft?: boolean;
   base?: string;
   labels?: string[];
@@ -64,8 +67,10 @@ export function expandFixture(spec: FixtureSpec, now: Date, repoUrl = 'https://g
     for (let i = 0; i < c.count; i++) commits.push({ commit: { oid: `${spec.number.toString(16)}${(oid++).toString(16).padStart(8, '0')}`, committedDate: iso(now, c.hoursAgo + i * 0.01) } });
   }
 
+  const closedAt = spec.state ? iso(now, spec.closedHoursAgo ?? 0) : null;
   const times = [
     iso(now, spec.createdDaysAgo * 24),
+    ...(closedAt ? [closedAt] : []),
     ...comments.map((c) => c!.createdAt),
     ...reviews.flatMap((r) => (r.submittedAt ? [r.submittedAt] : [])),
     ...commits.map((c) => c.commit.committedDate),
@@ -77,9 +82,12 @@ export function expandFixture(spec: FixtureSpec, now: Date, repoUrl = 'https://g
     number: spec.number,
     title: spec.title,
     url: `${repoUrl}/pull/${spec.number}`,
+    state: spec.state?.toUpperCase() ?? 'OPEN',
     isDraft: !!spec.draft,
     createdAt: iso(now, spec.createdDaysAgo * 24),
     updatedAt,
+    closedAt,
+    mergedAt: spec.state === 'merged' ? closedAt : null,
     baseRefName: spec.base ?? 'main',
     additions: files.reduce((n, f) => n + f.additions, 0),
     deletions: files.reduce((n, f) => n + f.deletions, 0),

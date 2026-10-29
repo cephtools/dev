@@ -9,6 +9,7 @@
   --link: #0b57c2;
   --add: #116329;
   --del: #b3261e;
+  --merged: #8250df;
   --warn-bg: #fff4d6;
   --warn-border: #c78a00;
   --error-bg: #fde7e7;
@@ -35,6 +36,7 @@
     --link: #8ab4f8;
     --add: #6fd38a;
     --del: #ff8a80;
+    --merged: #b392f0;
     --warn-bg: #3a3014;
     --warn-border: #e0b040;
     --error-bg: #3d1c1c;
@@ -133,6 +135,8 @@ main { padding-top: 10px; }
 .state { padding-top: 3px; }
 .state.open { color: var(--add); }
 .state.draft { color: var(--muted); }
+.state.merged { color: var(--merged); }
+.state.closed { color: var(--del); }
 .row-main { min-width: 0; }
 .row-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
 .row h3 { margin: 0; font-size: 1rem; line-height: 1.4; font-weight: 600; }
@@ -168,6 +172,8 @@ main { padding-top: 10px; }
 }
 .chip.label { background: transparent; border-color: var(--border); color: var(--muted); }
 .badge.draft { border-color: var(--border); background: transparent; }
+.badge.merged { border-color: var(--merged); background: transparent; color: var(--merged); }
+.badge.closed { border-color: var(--del); background: transparent; color: var(--del); }
 .badge.backport { border-color: var(--info-border); background: transparent; }
 .badge.warn { background: var(--warn-bg); border-color: var(--warn-border); }
 .badge.ci-fail { background: var(--error-bg); border-color: var(--error-border); }

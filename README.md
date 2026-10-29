@@ -13,7 +13,8 @@ The scores are independent. Technical importance is computed only from *what a P
 
 Views: **Trending**, **Technical importance**, **Subsystems** (BlueStore, RocksDB & metadata,
 Crimson & Seastar, OSD performance, Memory management, CephFS, Major architectural changes) and
-**About / Scoring**, which documents the live scoring parameters. Clicking a PR opens a detail panel
+**About / Scoring**, which documents the live scoring parameters. Every view lists open PRs unless
+the **Status** filter asks for PRs merged or closed in the last 30 days (or any status). Clicking a PR opens a detail panel
 with measured metrics, score breakdowns, classification evidence and links to the changed files on GitHub.
 
 ## How it works
@@ -22,6 +23,7 @@ with measured metrics, score breakdowns, classification evidence and links to th
 GitHub Actions (cron, every 3h)
   └─ src/cli/collect.ts
        list open PRs (GraphQL, paginated)                ← cheap, always complete
+       list PRs merged/closed in the last 30 days        ← newest updates first, stops at the cutoff
        fetch details only for new/changed/aged PRs       ← incremental, batched, budgeted
        merge into cache.json (dedup by node id)
        score: trending (activity) + technical (paths/text)
@@ -107,6 +109,7 @@ No token is ever sent to the browser; the frontend only reads static JSON.
 - **Refresh frequency**: the `cron` line in `.github/workflows/update.yml`; keep `site.refreshHours`
   and `site.staleAfterHours` in `config/dashboard.json` consistent (they drive the stale-data banner).
 - **Windows, weights, thresholds**: `windows`, `trending`, `importance` in `config/dashboard.json`.
+- **Merged/closed PRs**: `collection.closedDays` (default 30) in `config/dashboard.json`; `0` collects open PRs only.
 - **Classification rules**: `config/subsystems.json`. Within a subsystem, list specific path rules before
   general ones (each file counts for its first matching rule).
 
@@ -131,6 +134,8 @@ Full details, with the live parameters, are on the dashboard's **About / Scoring
 - **Unusual activity** flags PRs at or above median + 3×MAD of currently active PRs. This is a robust outlier
   rule, not a statistical significance test.
 - Rank movement is compared with the snapshot closest to 24h earlier (kept 14 days on the data branch).
+- Merged and closed PRs are scored the same way but get no rank; ranks, rank movement and the unusual-activity
+  threshold only consider open PRs.
 
 ### Technical importance (heuristic)
 

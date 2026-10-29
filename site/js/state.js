@@ -30,7 +30,7 @@ export const DEFAULT_FILTERS = {
   sub: '',
   author: '',
   label: '',
-  status: 'all', // all | ready | draft
+  status: 'open', // open | ready | draft (open) | done | merged | closed (recently merged/closed) | all
   win: '7d',
   min: '', // empty: view default
   backports: '', // '1': also show PRs targeting release branches
@@ -77,6 +77,22 @@ export function effectiveMin(view, filters, dataset) {
 
 const CONF_RANK = { high: 3, medium: 2, low: 1 };
 
+/** 'open', 'merged' or 'closed'; datasets from before merged/closed PRs were collected have no state. */
+export function prState(pr) {
+  return pr.state ?? 'open';
+}
+
+export function matchesStatus(pr, status) {
+  const state = prState(pr);
+  if (status === 'all') return true;
+  if (status === 'done') return state !== 'open';
+  if (status === 'merged' || status === 'closed') return state === status;
+  if (state !== 'open') return false;
+  if (status === 'ready') return !pr.isDraft;
+  if (status === 'draft') return pr.isDraft;
+  return true;
+}
+
 export function windowMetrics(pr, win) {
   return pr.metrics[win] ?? Object.values(pr.metrics)[0];
 }
@@ -98,8 +114,7 @@ export function applyFilters(prs, view, filters, dataset) {
     if (filters.sub && !pr.technical.subsystems.some((s) => s.id === filters.sub)) return false;
     if (filters.author && (pr.author ?? '').toLowerCase() !== filters.author.toLowerCase()) return false;
     if (filters.label && !pr.labels.includes(filters.label)) return false;
-    if (filters.status === 'draft' && !pr.isDraft) return false;
-    if (filters.status === 'ready' && pr.isDraft) return false;
+    if (!matchesStatus(pr, filters.status)) return false;
     if (filters.backports !== '1' && !mainBranches.includes(pr.baseRef)) return false;
     if (filters.active === '1') {
       const m = windowMetrics(pr, filters.win);

@@ -13,6 +13,7 @@
     "refreshAfterHours": 48,
     "maxDetailPrsPerRun": 2000,
     "bootstrapMaxDetailPrs": 400,
+    "closedDays": 30,
     "rateLimitReserve": 100,
     "maxRateLimitWaitSeconds": 120,
     "maxRetries": 4,

@@ -2,7 +2,7 @@
 // node ids (or commit oids), so the same activity is never counted twice.
 
 import type { CollectionConfig } from '../config.ts';
-import type { ActivityEvent, ChangedFile, PrRecord, ReviewState } from '../types.ts';
+import type { ActivityEvent, ChangedFile, PrRecord, PrState, ReviewState } from '../types.ts';
 import { stripTemplate } from '../util/text.ts';
 
 interface RawActor { login: string; __typename?: string }
@@ -12,9 +12,13 @@ export interface RawPrListNode {
   number: number;
   title: string;
   url: string;
+  /** GitHub PullRequestState: OPEN, CLOSED or MERGED. */
+  state?: string;
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
+  closedAt?: string | null;
+  mergedAt?: string | null;
   baseRefName: string;
   additions?: number;
   deletions?: number;
@@ -53,6 +57,10 @@ function compileIgnore(config: CollectionConfig): RegExp[] {
   return config.ignoreCommentPatterns.map((p) => new RegExp(p, 'i'));
 }
 
+function prState(state: string | undefined): PrState {
+  return state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : 'open';
+}
+
 /** Fields available from the PR list query; enough for a stub record. */
 export function normalizeListNode(raw: RawPrListNode, config: CollectionConfig): PrRecord {
   return {
@@ -61,8 +69,11 @@ export function normalizeListNode(raw: RawPrListNode, config: CollectionConfig):
     url: raw.url,
     author: raw.author?.login ?? null,
     authorIsBot: isBot(raw.author, config),
+    state: prState(raw.state),
     isDraft: !!raw.isDraft,
     createdAt: raw.createdAt,
+    closedAt: raw.closedAt ?? null,
+    mergedAt: raw.mergedAt ?? null,
     updatedAt: raw.updatedAt,
     baseRef: raw.baseRefName ?? 'main',
     labels: nodes(raw.labels).map((l) => l.name),

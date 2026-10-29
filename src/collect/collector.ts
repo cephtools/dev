@@ -1,17 +1,22 @@
-// Collection pipeline: list all open PRs → pick the ones whose details are missing or
-// stale → fetch details in batches within the API budget → merge into the cache.
+// Collection pipeline: list all open PRs and recently merged/closed ones → pick the ones
+// whose details are missing or stale → fetch details in batches within the API budget →
+// merge into the cache.
 
 import type { DashboardConfig } from '../config.ts';
 import { GitHubClient, RateLimitError, TransientError, type GraphQLResult } from '../github/client.ts';
-import { LIST_OPEN_PRS, PR_FILES_PAGE, prDetailBatchQuery } from '../github/queries.ts';
+import { LIST_CLOSED_PRS, LIST_OPEN_PRS, PR_FILES_PAGE, prDetailBatchQuery } from '../github/queries.ts';
 import type { ChangedFile, PrRecord } from '../types.ts';
-import { HOUR_MS, ms } from '../util/time.ts';
+import { DAY_MS, HOUR_MS, ms } from '../util/time.ts';
 import { mergeRecord, refreshListFields, type PrCache } from './cache.ts';
 import { normalizeDetailNode, normalizeListNode, type RawPrDetailNode, type RawPrListNode } from './normalize.ts';
 
 export interface CollectStats {
   totalOpen: number;
+  /** Open PRs listed. */
   listed: number;
+  /** PRs merged or closed within the last `closedDays` days. */
+  closedListed: number;
+  closedDays: number;
   fetched: number;
   failed: number[];
   cachedFresh: number;
@@ -46,6 +51,10 @@ interface ListResponse {
   repository: { pullRequests: ListConnection } | null;
 }
 
+interface ClosedListResponse {
+  repository: { pullRequests: Omit<ListConnection, 'totalCount'> } | null;
+}
+
 export async function listOpenPrs(client: GitHubClient, config: DashboardConfig): Promise<{ prs: PrRecord[]; totalCount: number }> {
   const byNumber = new Map<number, PrRecord>();
   let after: string | null = null;
@@ -72,6 +81,36 @@ export async function listOpenPrs(client: GitHubClient, config: DashboardConfig)
   return { prs, totalCount };
 }
 
+/**
+ * List PRs merged or closed within the last `closedDays` days. Old PRs that were merely
+ * updated recently (a late comment, a label change) are skipped. GitHub's totalCount
+ * covers the whole closed history, so there is no completeness check as for open PRs.
+ */
+export async function listClosedPrs(client: GitHubClient, config: DashboardConfig, now: Date): Promise<PrRecord[]> {
+  const days = config.collection.closedDays;
+  if (!(days > 0)) return [];
+  const cutoff = now.getTime() - days * DAY_MS;
+  const byNumber = new Map<number, PrRecord>();
+  let after: string | null = null;
+  for (let page = 0; page < 1000; page++) {
+    const vars: Record<string, unknown> = { owner: config.repo.owner, name: config.repo.name, first: config.collection.listPageSize, after };
+    const { data }: GraphQLResult<ClosedListResponse> = await client.graphql<ClosedListResponse>(LIST_CLOSED_PRS, vars);
+    const conn = data.repository?.pullRequests;
+    if (!conn) throw new CollectionError(`repository ${config.repo.owner}/${config.repo.name} not found or not accessible`);
+    // Ordered by updatedAt, newest first: once a PR was last updated before the cutoff,
+    // every later one was too, and none of them can have been closed after it.
+    let reachedCutoff = false;
+    for (const node of conn.nodes) {
+      if (!node) continue;
+      if (Date.parse(node.updatedAt) < cutoff) reachedCutoff = true;
+      else if (node.closedAt && Date.parse(node.closedAt) >= cutoff) byNumber.set(node.number, normalizeListNode(node, config.collection));
+    }
+    if (reachedCutoff || !conn.pageInfo.hasNextPage) break;
+    after = conn.pageInfo.endCursor;
+  }
+  return [...byNumber.values()];
+}
+
 /** Decide which PRs need a detail fetch, most valuable first. */
 export function selectForRefresh(listed: PrRecord[], cache: PrCache, config: DashboardConfig, now: Date): PrRecord[] {
   const refreshMs = config.collection.refreshAfterHours * HOUR_MS;
@@ -80,10 +119,13 @@ export function selectForRefresh(listed: PrRecord[], cache: PrCache, config: Das
   for (const pr of listed) {
     const cached = cache.records[pr.number];
     if (!cached || cached.detail !== 'full' || cached.updatedAt !== pr.updatedAt) changed.push(pr);
-    else if (!cached.fetchedAt || now.getTime() - Date.parse(cached.fetchedAt) > refreshMs) aged.push(pr);
+    // Merged and closed PRs only change with updatedAt, so they are never refreshed by age.
+    else if (pr.state === 'open' && (!cached.fetchedAt || now.getTime() - Date.parse(cached.fetchedAt) > refreshMs)) aged.push(pr);
   }
-  // Recently updated PRs first: they are the ones whose scores move.
-  changed.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  // Open PRs first (they are what the dashboard is for), then recently updated ones:
+  // they are the ones whose scores move.
+  const closedLast = (pr: PrRecord) => (pr.state === 'open' ? 0 : 1);
+  changed.sort((a, b) => closedLast(a) - closedLast(b) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   aged.sort((a, b) => ms(cache.records[a.number].fetchedAt) - ms(cache.records[b.number].fetchedAt));
   return [...changed, ...aged];
 }
@@ -157,14 +199,20 @@ export interface CollectOptions {
 }
 
 /**
- * Run a collection. Throws CollectionError (or a GitHub error) if the open-PR list
- * cannot be obtained; detail fetch problems degrade to a partial result instead.
+ * Run a collection. Throws CollectionError (or a GitHub error) if the open or closed PR
+ * list cannot be obtained; detail fetch problems degrade to a partial result instead.
  * Mutates `cache` in place.
  */
 export async function collect({ client, config, cache, now, log = () => {} }: CollectOptions): Promise<CollectResult> {
   const notes: string[] = [];
-  const { prs: listed, totalCount } = await listOpenPrs(client, config);
-  log(`listed ${listed.length} open PRs (GitHub reports ${totalCount})`);
+  const { prs: open, totalCount } = await listOpenPrs(client, config);
+  log(`listed ${open.length} open PRs (GitHub reports ${totalCount})`);
+  const { closedDays } = config.collection;
+  const closed = await listClosedPrs(client, config, now);
+  if (closedDays > 0) log(`listed ${closed.length} PRs merged or closed in the last ${closedDays} days`);
+  // A PR closed between the two listings appears in both; the later, closed entry wins.
+  const listed = [...new Map([...open, ...closed].map((p) => [p.number, p])).values()];
+  const closedListed = listed.filter((p) => p.state !== 'open').length;
 
   // First run: publish early with the most recently updated PRs; later runs catch up.
   const bootstrap = Object.keys(cache.records).length === 0;
@@ -172,7 +220,7 @@ export async function collect({ client, config, cache, now, log = () => {} }: Co
   const candidates = selectForRefresh(listed, cache, config, now);
   const queue = candidates.slice(0, cap);
   if (candidates.length > queue.length) {
-    notes.push(`${bootstrap ? 'First run: f' : 'F'}etched details for the ${queue.length} most recently updated PRs; ${candidates.length - queue.length} more will be fetched in the next run(s).`);
+    notes.push(`${bootstrap ? 'First run: f' : 'F'}etched details for ${queue.length} PRs (open ones first, most recently updated first); ${candidates.length - queue.length} more will be fetched in the next run(s).`);
   }
   const fetchedNumbers = new Set<number>();
   const failed: number[] = [];
@@ -219,9 +267,9 @@ export async function collect({ client, config, cache, now, log = () => {} }: Co
     partial = true;
   }
 
-  // Drop PRs that are no longer open; refresh cheap list fields on the rest.
-  const openNumbers = new Set(listed.map((p) => String(p.number)));
-  for (const key of Object.keys(cache.records)) if (!openNumbers.has(key)) delete cache.records[key];
+  // Drop PRs that are neither open nor recently closed; refresh cheap list fields on the rest.
+  const listedNumbers = new Set(listed.map((p) => String(p.number)));
+  for (const key of Object.keys(cache.records)) if (!listedNumbers.has(key)) delete cache.records[key];
 
   const refreshMs = config.collection.refreshAfterHours * HOUR_MS;
   let stale = 0;
@@ -236,7 +284,7 @@ export async function collect({ client, config, cache, now, log = () => {} }: Co
     const merged = refreshListFields(cached, pr);
     cache.records[pr.number] = merged;
     if (!fetchedNumbers.has(pr.number)) {
-      const outdated = cached.updatedAt !== pr.updatedAt || now.getTime() - ms(cached.fetchedAt) > refreshMs;
+      const outdated = cached.updatedAt !== pr.updatedAt || (pr.state === 'open' && now.getTime() - ms(cached.fetchedAt) > refreshMs);
       if (outdated) stale++;
       else cachedFresh++;
     }
@@ -249,7 +297,9 @@ export async function collect({ client, config, cache, now, log = () => {} }: Co
     records,
     stats: {
       totalOpen: totalCount,
-      listed: listed.length,
+      listed: listed.length - closedListed,
+      closedListed,
+      closedDays,
       fetched: fetchedNumbers.size,
       failed,
       cachedFresh,

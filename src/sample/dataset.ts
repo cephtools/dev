@@ -25,8 +25,10 @@ export function sampleDataset(now: Date) {
   const config = loadConfig({});
   const records = sampleRecords(now);
   const missing = records.filter((r) => r.detail !== 'full').length;
+  const open = records.filter((r) => r.state === 'open').length;
   const stats: CollectStats = {
-    totalOpen: records.length, listed: records.length, fetched: records.length - missing, failed: [], cachedFresh: 0,
+    totalOpen: open, listed: open, closedListed: records.length - open, closedDays: config.collection.closedDays,
+    fetched: records.length - missing, failed: [], cachedFresh: 0,
     stale: 0, missing, partial: missing > 0,
     notes: ['Sample dataset generated from test fixtures; not live data.', ...(missing ? [`${missing} PR(s) have no detail data yet (only list metadata); their scores are incomplete.`] : [])],
     apiCost: 0, apiRequests: 0, rateLimitRemaining: null,

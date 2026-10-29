@@ -9,7 +9,9 @@ commits, force-push events, files and CI state for 10 PRs at about 1 point. The 
 
 **Incremental collection.** Every run lists all open PRs (cheap, ~19 requests) so the open set is always
 complete, then fetches details only for PRs that are new, whose `updatedAt` changed, or whose details are
-older than 48h. The per-PR cache also accumulates events beyond GitHub's 100-per-connection limit.
+older than 48h. PRs merged or closed in the last `closedDays` are listed too (ordered by `updatedAt`, so
+paging stops at the cutoff) and stay in the cache until they age out; open PRs get detail fetches first.
+The per-PR cache also accumulates events beyond GitHub's 100-per-connection limit.
 A rate-limit reserve and a per-run cap bound the cost; leftover work rolls over to the next run.
 
 **State on a data branch.** `cache.json`, `history.json` and the published data live on `dashboard-data`

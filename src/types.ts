@@ -22,6 +22,9 @@ export interface ActivityEvent {
   hasBody?: boolean;
 }
 
+/** Lifecycle state, lower-cased from GitHub's PullRequestState. */
+export type PrState = 'open' | 'merged' | 'closed';
+
 export interface ChangedFile {
   path: string;
   additions: number;
@@ -35,8 +38,11 @@ export interface PrRecord {
   url: string;
   author: string | null;
   authorIsBot: boolean;
+  state: PrState;
   isDraft: boolean;
   createdAt: string;
+  closedAt: string | null;
+  mergedAt: string | null;
   /** updatedAt as of the last detail fetch (or listing, for stubs). */
   updatedAt: string;
   /** updatedAt from the most recent listing; differs from updatedAt when details are stale. */
